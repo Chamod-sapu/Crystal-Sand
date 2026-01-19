@@ -1,0 +1,3 @@
+login
+Room add, Services CRUD [Rooms price change and other parameter changes]
+Menubar modifications
