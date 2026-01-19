@@ -5,7 +5,9 @@ import {
   ShoppingCart,
   FileText,
   Menu,
-  X
+  X,
+  Building2,
+  TrendingUp
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -17,6 +19,8 @@ export default function Layout({ children }) {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Guests', href: '/guests', icon: Users },
     { name: 'New Guest', href: '/guests/new', icon: FileText },
+    { name: 'Rooms', href: '/rooms', icon: Building2 },
+    { name: 'Forecast', href: '/forecast', icon: TrendingUp },
   ]
 
   const isActive = (path) => {

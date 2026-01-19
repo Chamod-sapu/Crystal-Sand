@@ -7,11 +7,13 @@ import {
   Calendar,
   UserPlus,
   FileText,
-  Clock
+  Clock,
+  Building2,
+  CreditCard
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../utils/calculations'
-import { format, startOfMonth, endOfMonth, isToday } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
 
 export default function Dashboard() {
@@ -19,7 +21,11 @@ export default function Dashboard() {
     todayGuests: 0,
     monthGuests: 0,
     totalRevenue: 0,
-    pendingCheckouts: 0
+    pendingCheckouts: 0,
+    availableRooms: 0,
+    totalRooms: 0,
+    advancePaymentsCollected: 0,
+    upcomingReservations: 0
   })
   const [recentGuests, setRecentGuests] = useState([])
   const [revenueData, setRevenueData] = useState([])
@@ -39,6 +45,10 @@ export default function Dashboard() {
         .from('guests')
         .select('*')
         .order('created_at', { ascending: false })
+
+      const { data: rooms } = await supabase
+        .from('rooms')
+        .select('*')
 
       const todayGuests = guests?.filter(g =>
         format(new Date(g.created_at), 'yyyy-MM-dd') === today
@@ -66,11 +76,29 @@ export default function Dashboard() {
         new Date(g.date_of_departure) <= new Date()
       ).length || 0
 
+      const availableRooms = rooms?.filter(r => r.status === 'available').length || 0
+      const totalRooms = rooms?.length || 0
+
+      const advancePaymentsCollected = guests?.reduce((sum, g) => {
+        return sum + parseFloat(g.advance_payment_amount || 0)
+      }, 0) || 0
+
+      const upcomingReservations = guests?.filter(g => {
+        const checkInDate = new Date(g.date_of_arrival)
+        const thirtyDaysFromNow = new Date()
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
+        return g.status !== 'cancelled' && checkInDate >= new Date() && checkInDate <= thirtyDaysFromNow
+      }).length || 0
+
       setStats({
         todayGuests,
         monthGuests,
         totalRevenue: totalRevenue + purchasesRevenue,
-        pendingCheckouts
+        pendingCheckouts,
+        availableRooms,
+        totalRooms,
+        advancePaymentsCollected,
+        upcomingReservations
       })
 
       setRecentGuests(guests?.slice(0, 5) || [])
@@ -115,28 +143,44 @@ export default function Dashboard() {
       iconColor: 'text-blue-400'
     },
     {
-      title: 'Month\'s Guests',
-      value: stats.monthGuests,
-      icon: Calendar,
-      color: 'from-primary-500 to-primary-600',
-      bgColor: 'bg-primary-500/10',
-      iconColor: 'text-primary-400'
-    },
-    {
-      title: 'Total Revenue',
-      value: formatCurrency(stats.totalRevenue),
-      icon: DollarSign,
+      title: 'Available Rooms',
+      value: `${stats.availableRooms}/${stats.totalRooms}`,
+      icon: Building2,
       color: 'from-green-500 to-green-600',
       bgColor: 'bg-green-500/10',
       iconColor: 'text-green-400'
     },
     {
-      title: 'Pending Checkouts',
-      value: stats.pendingCheckouts,
-      icon: Clock,
+      title: 'Total Revenue',
+      value: formatCurrency(stats.totalRevenue),
+      icon: DollarSign,
+      color: 'from-primary-500 to-primary-600',
+      bgColor: 'bg-primary-500/10',
+      iconColor: 'text-primary-400'
+    },
+    {
+      title: 'Advance Payments',
+      value: formatCurrency(stats.advancePaymentsCollected),
+      icon: CreditCard,
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'bg-purple-500/10',
+      iconColor: 'text-purple-400'
+    },
+    {
+      title: 'Upcoming (30 Days)',
+      value: stats.upcomingReservations,
+      icon: Calendar,
       color: 'from-orange-500 to-orange-600',
       bgColor: 'bg-orange-500/10',
       iconColor: 'text-orange-400'
+    },
+    {
+      title: 'Pending Checkouts',
+      value: stats.pendingCheckouts,
+      icon: Clock,
+      color: 'from-red-500 to-red-600',
+      bgColor: 'bg-red-500/10',
+      iconColor: 'text-red-400'
     }
   ]
 
@@ -164,7 +208,7 @@ export default function Dashboard() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {statCards.map((stat, index) => (
           <div
             key={stat.title}

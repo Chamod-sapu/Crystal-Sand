@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateGRCNumber } from '../utils/grcGenerator'
 import { calculateRoomCharges } from '../utils/calculations'
+import { getAvailableRoomsForDateRange } from '../utils/availability'
 import { format } from 'date-fns'
 import { Save, ArrowLeft, Plus, X } from 'lucide-react'
 
 export default function NewGuest() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
-  const [rooms, setRooms] = useState([])
+  const [allRooms, setAllRooms] = useState([])
+  const [availableRooms, setAvailableRooms] = useState([])
+  const [guests, setGuests] = useState([])
   const [formData, setFormData] = useState({
     name_with_initials: '',
     passport_nic: '',
@@ -23,31 +26,65 @@ export default function NewGuest() {
     number_of_adults: 2,
     number_of_children: 0,
     children_ages: [],
-    meal_plan: '',
+    meal_plan: 'BB',
     date_of_arrival: format(new Date(), 'yyyy-MM-dd'),
     date_of_departure: '',
     time_of_arrival: '14:00',
-    time_of_departure: '12:00'
+    time_of_departure: '12:00',
+    advance_payment_amount: 0,
+    advance_payment_date: format(new Date(), 'yyyy-MM-dd'),
+    advance_payment_method: '',
+    remarks: ''
   })
 
   useEffect(() => {
-    loadRooms()
+    loadData()
   }, [])
 
-  async function loadRooms() {
-    const { data } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('status', 'available')
-      .order('room_number')
-    setRooms(data || [])
+  useEffect(() => {
+    updateAvailableRooms()
+  }, [formData.room_type, formData.date_of_arrival, formData.date_of_departure, allRooms, guests])
+
+  async function loadData() {
+    try {
+      const { data: roomsData } = await supabase
+        .from('rooms')
+        .select('*')
+        .order('room_number')
+
+      const { data: guestsData } = await supabase
+        .from('guests')
+        .select('*')
+
+      setAllRooms(roomsData || [])
+      setGuests(guestsData || [])
+    } catch (error) {
+      console.error('Error loading data:', error)
+    }
+  }
+
+  function updateAvailableRooms() {
+    if (!formData.date_of_arrival || !formData.date_of_departure) {
+      setAvailableRooms([])
+      return
+    }
+
+    const available = getAvailableRoomsForDateRange(
+      allRooms.filter(r => r.room_type === formData.room_type),
+      guests,
+      formData.date_of_arrival,
+      formData.date_of_departure,
+      formData.room_type
+    )
+
+    setAvailableRooms(available.sort((a, b) => a.room_number.localeCompare(b.room_number)))
   }
 
   const handleChange = (e) => {
     const { name, value, type } = e.target
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? parseInt(value) || 0 : value
+      [name]: type === 'number' ? parseFloat(value) || 0 : value
     }))
   }
 
@@ -100,7 +137,7 @@ export default function NewGuest() {
 
       const grcNumber = await generateGRCNumber(supabase)
 
-      const selectedRoom = rooms.find(r => r.room_number === formData.room_numbers[0])
+      const selectedRoom = allRooms.find(r => r.room_number === formData.room_numbers[0])
       const roomCharge = calculateRoomCharges(
         formData.date_of_arrival,
         formData.date_of_departure,
@@ -245,11 +282,10 @@ export default function NewGuest() {
                 onChange={handleChange}
                 className="input-field"
               >
-                <option value="">Select meal plan</option>
+                <option value="RO">Room Only</option>
                 <option value="BB">Bed & Breakfast (BB)</option>
                 <option value="HB">Half Board (HB)</option>
                 <option value="FB">Full Board (FB)</option>
-                <option value="AI">All Inclusive (AI)</option>
               </select>
             </div>
           </div>
@@ -262,13 +298,13 @@ export default function NewGuest() {
           </h2>
           <div className="mb-6">
             <label className="label">Room Type *</label>
-            <div className="grid grid-cols-3 gap-4">
-              {['SGL', 'DBL', 'TPL'].map(type => (
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+              {['SGL', 'DBL', 'TPL', 'QUAD', 'FAMILY'].map(type => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, room_type: type, room_numbers: [] }))}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-4 rounded-lg border-2 transition-all text-center ${
                     formData.room_type === type
                       ? 'border-primary-600 bg-primary-600/10 text-white'
                       : 'border-dark-700 hover:border-dark-600 text-gray-400'
@@ -276,7 +312,7 @@ export default function NewGuest() {
                 >
                   <div className="font-bold text-lg">{type}</div>
                   <div className="text-xs mt-1">
-                    {type === 'SGL' ? 'Single' : type === 'DBL' ? 'Double' : 'Triple'}
+                    {type === 'SGL' ? 'Single' : type === 'DBL' ? 'Double' : type === 'TPL' ? 'Triple' : type === 'QUAD' ? 'Quad' : 'Family'}
                   </div>
                 </button>
               ))}
@@ -285,10 +321,12 @@ export default function NewGuest() {
 
           <div className="mb-6">
             <label className="label">Select Room(s) *</label>
+            <p className="text-xs text-gray-500 mb-3">
+              Showing {availableRooms.length} available room(s)
+            </p>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {rooms
-                .filter(room => room.room_type === formData.room_type)
-                .map(room => (
+              {availableRooms.length > 0 ? (
+                availableRooms.map(room => (
                   <button
                     key={room.id}
                     type="button"
@@ -299,14 +337,18 @@ export default function NewGuest() {
                         : 'border-dark-700 hover:border-dark-600 text-gray-400'
                     }`}
                   >
-                    <div className="font-bold">{room.room_number}</div>
-                    <div className="text-xs mt-1">LKR {room.base_price}</div>
+                    <div className="font-bold text-lg">{room.room_number}</div>
+                    <div className="text-xs mt-1">Floor {room.floor || 1}</div>
                   </button>
-                ))}
+                ))
+              ) : (
+                <div className="col-span-full text-center py-8 text-gray-500">
+                  {formData.date_of_arrival && formData.date_of_departure
+                    ? 'No available rooms for these dates'
+                    : 'Select check-in and check-out dates'}
+                </div>
+              )}
             </div>
-            {rooms.filter(room => room.room_type === formData.room_type).length === 0 && (
-              <p className="text-gray-500 text-sm mt-2">No available rooms for this type</p>
-            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -426,6 +468,70 @@ export default function NewGuest() {
               />
               <p className="text-xs text-gray-500 mt-1">Standard check-out: 12:00 hrs</p>
             </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">5</span>
+            <span>Advance Payment (Optional)</span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="label">Advance Amount (LKR)</label>
+              <input
+                type="number"
+                name="advance_payment_amount"
+                value={formData.advance_payment_amount}
+                onChange={handleChange}
+                className="input-field"
+                min="0"
+                step="100"
+              />
+            </div>
+            <div>
+              <label className="label">Payment Date</label>
+              <input
+                type="date"
+                name="advance_payment_date"
+                value={formData.advance_payment_date}
+                onChange={handleChange}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="label">Payment Method</label>
+              <select
+                name="advance_payment_method"
+                value={formData.advance_payment_method}
+                onChange={handleChange}
+                className="input-field"
+              >
+                <option value="">Select method</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="online">Online Transfer</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">6</span>
+            <span>Special Requests & Remarks</span>
+          </h2>
+          <div>
+            <label className="label">Guest Remarks</label>
+            <textarea
+              name="remarks"
+              value={formData.remarks}
+              onChange={handleChange}
+              className="input-field"
+              rows="4"
+              placeholder="Late check-in, special meals, accessibility requests, etc."
+            />
+            <p className="text-xs text-gray-500 mt-2">For informational purposes only - does not affect billing</p>
           </div>
         </div>
 

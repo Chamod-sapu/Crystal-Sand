@@ -150,7 +150,8 @@ export default function GuestDetails() {
     const bill = calculateBillTotal(
       guest.total_room_charge,
       purchases,
-      settings.tax_percentage
+      settings.tax_percentage,
+      guest.advance_payment_amount
     )
 
     const doc = new jsPDF()
@@ -221,12 +222,22 @@ export default function GuestDetails() {
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
-    doc.text('Total:', 130, finalY + 24)
-    doc.text(formatCurrency(bill.total), 180, finalY + 24, { align: 'right' })
+    doc.text('Grand Total:', 130, finalY + 24)
+    doc.text(formatCurrency(bill.grandTotal), 180, finalY + 24, { align: 'right' })
 
-    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    if (bill.advancePayment > 0) {
+      doc.text('Advance Payment:', 130, finalY + 32)
+      doc.text(formatCurrency(bill.advancePayment), 180, finalY + 32, { align: 'right' })
+      doc.setFont('helvetica', 'bold')
+      doc.text('Balance Due:', 130, finalY + 40)
+      doc.text(formatCurrency(bill.balanceDue), 180, finalY + 40, { align: 'right' })
+    }
+
     doc.setFont('helvetica', 'italic')
-    doc.text('Thank you for staying with us!', 105, finalY + 40, { align: 'center' })
+    doc.setFontSize(9)
+    doc.text('Thank you for staying with us!', 105, finalY + 50, { align: 'center' })
 
     doc.text('_________________________', 40, 270)
     doc.text('Authorized Signature', 45, 276)
@@ -369,6 +380,40 @@ export default function GuestDetails() {
                 </div>
               </div>
             </div>
+
+            {(guest.remarks || guest.advance_payment_amount > 0) && (
+              <div className="mt-6 pt-6 border-t border-dark-800 space-y-4">
+                {guest.remarks && (
+                  <div>
+                    <p className="text-gray-400 text-sm mb-2">Special Requests & Remarks</p>
+                    <p className="text-white bg-dark-800 p-3 rounded-lg">{guest.remarks}</p>
+                  </div>
+                )}
+                {guest.advance_payment_amount > 0 && (
+                  <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                    <p className="text-green-400 font-medium mb-3">Advance Payment Details</p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Amount Paid</span>
+                        <span className="text-white font-medium">{formatCurrency(guest.advance_payment_amount)}</span>
+                      </div>
+                      {guest.advance_payment_date && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Payment Date</span>
+                          <span className="text-white font-medium">{format(new Date(guest.advance_payment_date), 'dd MMM yyyy')}</span>
+                        </div>
+                      )}
+                      {guest.advance_payment_method && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Method</span>
+                          <span className="text-white font-medium capitalize">{guest.advance_payment_method}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="card p-6">
@@ -528,9 +573,21 @@ export default function GuestDetails() {
                   <span className="text-white font-medium">{formatCurrency(bill.tax)}</span>
                 </div>
                 <div className="flex justify-between py-3 bg-primary-600/10 rounded-lg px-3">
-                  <span className="text-white font-bold text-lg">Total</span>
-                  <span className="text-primary-400 font-bold text-lg">{formatCurrency(bill.total)}</span>
+                  <span className="text-white font-bold text-lg">Grand Total</span>
+                  <span className="text-primary-400 font-bold text-lg">{formatCurrency(bill.grandTotal)}</span>
                 </div>
+                {bill.advancePayment > 0 && (
+                  <>
+                    <div className="flex justify-between py-2 border-b border-dark-800">
+                      <span className="text-gray-400">Advance Payment</span>
+                      <span className="text-green-400 font-medium">-{formatCurrency(bill.advancePayment)}</span>
+                    </div>
+                    <div className="flex justify-between py-3 bg-green-500/10 rounded-lg px-3">
+                      <span className="text-white font-bold text-lg">Balance Due</span>
+                      <span className="text-green-400 font-bold text-lg">{formatCurrency(bill.balanceDue)}</span>
+                    </div>
+                  </>
+                )}
 
                 <button
                   onClick={generateInvoicePDF}
