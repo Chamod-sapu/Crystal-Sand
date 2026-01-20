@@ -15,9 +15,12 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/guests" element={<GuestList />} />
           <Route path="/guests/new" element={<NewGuest />} />
+          {/* Make sure this route matches what you're navigating to */}
           <Route path="/guests/:id" element={<GuestDetails />} />
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/forecast" element={<ReservationForecast />} />
+          {/* Add a catch-all route for debugging */}
+          <Route path="*" element={<div>404 - Page not found</div>} />
         </Routes>
       </Layout>
     </BrowserRouter>
