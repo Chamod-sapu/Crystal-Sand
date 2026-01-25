@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, calculateBillTotal } from '../utils/calculations'
-import { format } from 'date-fns'
+import { format, differenceInDays, addDays, parseISO } from 'date-fns'
 import {
   ArrowLeft,
   User,
@@ -15,7 +15,12 @@ import {
   Plus,
   FileText,
   Printer,
-  LogOut
+  LogOut,
+  CalendarPlus,
+  AlertCircle,
+  X,
+  Percent,
+  Tag
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
@@ -36,10 +41,30 @@ export default function GuestDetails() {
     unit_price: 0
   })
 
+  // Extend Stay states
+  const [showExtendStay, setShowExtendStay] = useState(false)
+  const [extendDate, setExtendDate] = useState('')
+  const [extendLoading, setExtendLoading] = useState(false)
+  const [extendError, setExtendError] = useState('')
+  const [extendPreview, setExtendPreview] = useState(null)
+
+  // Document preview states
+  const [showDocumentPreview, setShowDocumentPreview] = useState(false)
+  const [documentUrl, setDocumentUrl] = useState(null)
+  const [documentError, setDocumentError] = useState(null)
+
   useEffect(() => {
     loadGuestData()
     loadSettings()
   }, [id])
+
+  useEffect(() => {
+    if (extendDate && guest) {
+      calculateExtendPreview()
+    } else {
+      setExtendPreview(null)
+    }
+  }, [extendDate, guest])
 
   async function loadGuestData() {
     try {
@@ -57,6 +82,25 @@ export default function GuestDetails() {
 
       setGuest(guestData)
       setPurchases(purchasesData || [])
+
+      if (guestData.passport_nic_document_url) {
+        const { data, error } = await supabase.storage
+          .from('guest-documents')
+          .createSignedUrl(guestData.passport_nic_document_url, 3600)
+
+        if (error) {
+          console.error('Error creating signed URL:', error)
+          setDocumentError('Failed to load document preview')
+          setDocumentUrl(null)
+        } else {
+          setDocumentUrl(data.signedUrl)
+          setDocumentError(null)
+        }
+      } else {
+        setDocumentUrl(null)
+        setDocumentError(null)
+      }
+
       setLoading(false)
     } catch (error) {
       console.error('Error loading guest:', error)
@@ -70,6 +114,143 @@ export default function GuestDetails() {
       .select('*')
       .single()
     setSettings(data)
+  }
+
+  async function checkRoomAvailability(newDepartureDate) {
+    try {
+      const { data: allGuests } = await supabase
+        .from('guests')
+        .select('*')
+        .neq('id', id)
+        .neq('status', 'cancelled')
+
+      const currentDeparture = new Date(guest.date_of_departure)
+      const newDeparture = new Date(newDepartureDate)
+
+      for (const roomNumber of guest.room_numbers) {
+        const conflicts = allGuests?.filter(g => {
+          if (!g.room_numbers?.includes(roomNumber)) return false
+          
+          const guestArrival = new Date(g.date_of_arrival)
+          const guestDeparture = new Date(g.date_of_departure)
+          
+          return (
+            (guestArrival > currentDeparture && guestArrival < newDeparture) ||
+            (guestDeparture > currentDeparture && guestDeparture <= newDeparture) ||
+            (guestArrival <= currentDeparture && guestDeparture >= newDeparture)
+          )
+        })
+
+        if (conflicts && conflicts.length > 0) {
+          return {
+            available: false,
+            conflictRoom: roomNumber,
+            conflictGuest: conflicts[0]
+          }
+        }
+      }
+
+      return { available: true }
+    } catch (error) {
+      console.error('Error checking availability:', error)
+      return { available: false, error: 'Failed to check availability' }
+    }
+  }
+
+  async function calculateExtendPreview() {
+    if (!extendDate || !guest || !settings) return
+
+    const newDepartureDate = new Date(extendDate)
+    const currentDeparture = new Date(guest.date_of_departure)
+
+    if (newDepartureDate <= currentDeparture) {
+      setExtendError('New checkout date must be after current checkout date')
+      setExtendPreview(null)
+      return
+    }
+
+    const availabilityCheck = await checkRoomAvailability(extendDate)
+    
+    if (!availabilityCheck.available) {
+      if (availabilityCheck.conflictRoom) {
+        setExtendError(
+          `Room ${availabilityCheck.conflictRoom} is not available. It's booked by ${availabilityCheck.conflictGuest.name_with_initials} (${availabilityCheck.conflictGuest.grc_number}) from ${format(new Date(availabilityCheck.conflictGuest.date_of_arrival), 'MMM dd')} to ${format(new Date(availabilityCheck.conflictGuest.date_of_departure), 'MMM dd, yyyy')}`
+        )
+      } else {
+        setExtendError(availabilityCheck.error || 'Rooms not available for selected dates')
+      }
+      setExtendPreview(null)
+      return
+    }
+
+    setExtendError('')
+
+    const arrival = new Date(guest.date_of_arrival)
+    const newNights = differenceInDays(newDepartureDate, arrival)
+    const additionalNights = differenceInDays(newDepartureDate, currentDeparture)
+    
+    const numberOfRooms = guest.room_numbers.length
+    const pricePerNight = parseFloat(guest.total_room_charge) / (guest.number_of_nights * numberOfRooms) || 0
+    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
+    const newTotalRoomCharge = parseFloat(guest.total_room_charge) + additionalCharge
+
+    setExtendPreview({
+      currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
+      newDeparture: format(newDepartureDate, 'MMM dd, yyyy'),
+      currentNights: guest.number_of_nights,
+      newNights,
+      additionalNights,
+      pricePerNight,
+      additionalCharge,
+      currentRoomCharge: parseFloat(guest.total_room_charge),
+      newTotalRoomCharge
+    })
+  }
+
+  async function handleExtendStay(e) {
+    e.preventDefault()
+    
+    if (!extendDate || !extendPreview) {
+      setExtendError('Please select a valid extension date')
+      return
+    }
+
+    setExtendLoading(true)
+
+    try {
+      const availabilityCheck = await checkRoomAvailability(extendDate)
+      
+      if (!availabilityCheck.available) {
+        setExtendError('Room availability changed. Please try again.')
+        setExtendLoading(false)
+        return
+      }
+
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          date_of_departure: extendDate,
+          number_of_nights: extendPreview.newNights,
+          total_room_charge: extendPreview.newTotalRoomCharge
+        })
+        .eq('id', id)
+
+      if (error) throw error
+
+      await loadGuestData()
+      
+      setShowExtendStay(false)
+      setExtendDate('')
+      setExtendPreview(null)
+      setExtendError('')
+      
+      alert(`Stay extended successfully! New checkout date: ${format(new Date(extendDate), 'MMM dd, yyyy')}`)
+    } catch (error) {
+      console.error('Error extending stay:', error)
+      setExtendError('Failed to extend stay. Please try again.')
+    } finally {
+      setExtendLoading(false)
+    }
   }
 
   async function handleAddPurchase(e) {
@@ -144,6 +325,35 @@ export default function GuestDetails() {
     }
   }
 
+  // Calculate discount information
+  function calculateDiscountInfo(guest) {
+    if (!guest.discount_type || !guest.discount_amount) {
+      return null
+    }
+
+    const discountedRoomCharge = parseFloat(guest.total_room_charge) || 0
+    let originalRoomCharge = discountedRoomCharge
+    let discountAmount = 0
+
+    if (guest.discount_type === 'percentage') {
+      // Reverse calculate: original = discounted / (1 - percentage/100)
+      originalRoomCharge = discountedRoomCharge / (1 - guest.discount_amount / 100)
+      discountAmount = originalRoomCharge - discountedRoomCharge
+    } else if (guest.discount_type === 'fixed') {
+      // Reverse calculate: original = discounted + fixed amount
+      originalRoomCharge = discountedRoomCharge + guest.discount_amount
+      discountAmount = guest.discount_amount
+    }
+
+    return {
+      originalRoomCharge,
+      discountAmount,
+      discountedRoomCharge,
+      discountType: guest.discount_type,
+      discountValue: guest.discount_amount
+    }
+  }
+
   function generateInvoicePDF() {
     if (!guest || !settings) return
 
@@ -153,6 +363,8 @@ export default function GuestDetails() {
       settings.tax_percentage,
       guest.advance_payment_amount
     )
+
+    const discountInfo = calculateDiscountInfo(guest)
 
     const doc = new jsPDF()
 
@@ -191,7 +403,21 @@ export default function GuestDetails() {
 
     const tableData = []
 
-    tableData.push(['Room Charges', '', '', formatCurrency(bill.roomCharges)])
+    // Add room charges with discount info if applicable
+    if (discountInfo) {
+      tableData.push(['Room Charges (Original)', '', '', formatCurrency(discountInfo.originalRoomCharge)])
+      tableData.push([
+        `Discount (${discountInfo.discountType === 'percentage' 
+          ? `${discountInfo.discountValue}%` 
+          : 'Fixed'})`,
+        '',
+        '',
+        `-${formatCurrency(discountInfo.discountAmount)}`
+      ])
+      tableData.push(['Room Charges (Discounted)', '', '', formatCurrency(discountInfo.discountedRoomCharge)])
+    } else {
+      tableData.push(['Room Charges', '', '', formatCurrency(bill.roomCharges)])
+    }
 
     purchases.forEach(purchase => {
       tableData.push([
@@ -222,7 +448,7 @@ export default function GuestDetails() {
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
-    doc.text('Grand Total:', 130, finalY + 24)
+    doc.text('Total:', 130, finalY + 24)
     doc.text(formatCurrency(bill.grandTotal), 180, finalY + 24, { align: 'right' })
 
     doc.setFont('helvetica', 'normal')
@@ -267,6 +493,8 @@ export default function GuestDetails() {
     settings.tax_percentage
   ) : null
 
+  const discountInfo = calculateDiscountInfo(guest)
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -284,16 +512,216 @@ export default function GuestDetails() {
         </div>
         <div className="flex items-center space-x-3">
           {guest.status === 'checked_in' && (
-            <button
-              onClick={handleCheckout}
-              className="btn-secondary flex items-center space-x-2"
-            >
-              <LogOut size={18} />
-              <span>Check Out</span>
-            </button>
+            <>
+              <button
+                onClick={() => setShowExtendStay(true)}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <CalendarPlus size={18} />
+                <span>Extend Stay</span>
+              </button>
+              <button
+                onClick={handleCheckout}
+                className="btn-secondary flex items-center space-x-2"
+              >
+                <LogOut size={18} />
+                <span>Check Out</span>
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* Extend Stay Modal */}
+      {showExtendStay && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-dark-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <CalendarPlus className="text-primary-400" size={24} />
+                  <h2 className="text-xl font-bold text-white">Extend Stay</h2>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowExtendStay(false)
+                    setExtendDate('')
+                    setExtendPreview(null)
+                    setExtendError('')
+                  }}
+                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleExtendStay} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+              <div className="bg-dark-800 p-4 rounded-lg space-y-3">
+                <h3 className="text-white font-semibold mb-3">Current Booking</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-400">Check-in</p>
+                    <p className="text-white font-medium">
+                      {format(new Date(guest.date_of_arrival), 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Current Check-out</p>
+                    <p className="text-white font-medium">
+                      {format(new Date(guest.date_of_departure), 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Current Nights</p>
+                    <p className="text-white font-medium">{guest.number_of_nights}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Room(s)</p>
+                    <p className="text-white font-medium">{guest.room_numbers.join(', ')}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="label">New Check-out Date *</label>
+                <input
+                  type="date"
+                  value={extendDate}
+                  onChange={(e) => setExtendDate(e.target.value)}
+                  min={format(addDays(new Date(guest.date_of_departure), 1), 'yyyy-MM-dd')}
+                  className="input-field"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Select a date after {format(new Date(guest.date_of_departure), 'MMM dd, yyyy')}
+                </p>
+              </div>
+
+              {extendError && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start space-x-3">
+                  <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+                  <p className="text-red-400 text-sm">{extendError}</p>
+                </div>
+              )}
+
+              {extendPreview && (
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
+                  <h3 className="text-green-400 font-semibold flex items-center space-x-2">
+                    <CalendarPlus size={18} />
+                    <span>Extension Preview</span>
+                  </h3>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">New Check-out Date</span>
+                      <span className="text-white font-medium">{extendPreview.newDeparture}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Additional Nights</span>
+                      <span className="text-white font-medium">+{extendPreview.additionalNights}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Total Nights</span>
+                      <span className="text-white font-medium">
+                        {extendPreview.currentNights} → {extendPreview.newNights}
+                      </span>
+                    </div>
+                    
+                    <div className="border-t border-green-500/20 pt-3 mt-3 space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Price per Night</span>
+                        <span className="text-white font-medium">
+                          {formatCurrency(extendPreview.pricePerNight)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Additional Charges</span>
+                        <span className="text-green-400 font-medium">
+                          +{formatCurrency(extendPreview.additionalCharge)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-base">
+                        <span className="text-white font-semibold">New Total Room Charge</span>
+                        <span className="text-green-400 font-bold">
+                          {formatCurrency(extendPreview.newTotalRoomCharge)}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Previous: {formatCurrency(extendPreview.currentRoomCharge)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-dark-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowExtendStay(false)
+                    setExtendDate('')
+                    setExtendPreview(null)
+                    setExtendError('')
+                  }}
+                  className="btn-secondary"
+                  disabled={extendLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex items-center space-x-2"
+                  disabled={extendLoading || !extendPreview || !!extendError}
+                >
+                  {extendLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CalendarPlus size={18} />
+                      <span>Confirm Extension</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Document Preview Modal */}
+      {showDocumentPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b border-dark-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Document Preview</h2>
+              <button
+                onClick={() => setShowDocumentPreview(false)}
+                className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+              >
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+            {documentError ? (
+              <div className="p-6 text-center text-red-400">
+                <AlertCircle size={48} className="mx-auto mb-4" />
+                <p>{documentError}</p>
+              </div>
+            ) : (
+              <div className="bg-white overflow-auto max-h-[70vh]">
+                <iframe
+                  src={documentUrl}
+                  className="w-full h-[70vh] min-h-[500px]"
+                  title="Document Preview"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -313,6 +741,17 @@ export default function GuestDetails() {
                   <div>
                     <p className="text-gray-400 text-sm">Passport / NIC</p>
                     <p className="text-white font-medium">{guest.passport_nic}</p>
+                    {documentUrl ? (
+                      <button
+                        onClick={() => setShowDocumentPreview(true)}
+                        className="text-primary-400 text-sm mt-1 flex items-center space-x-1 hover:underline"
+                      >
+                        <FileText size={14} />
+                        <span>View Document</span>
+                      </button>
+                    ) : (
+                      <p className="text-gray-500 text-sm mt-1">No document available</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
@@ -381,8 +820,44 @@ export default function GuestDetails() {
               </div>
             </div>
 
-            {(guest.remarks || guest.advance_payment_amount > 0) && (
+            {(guest.remarks || guest.advance_payment_amount > 0 || discountInfo) && (
               <div className="mt-6 pt-6 border-t border-dark-800 space-y-4">
+                {discountInfo && (
+                  <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                    <p className="text-yellow-400 font-medium mb-3 flex items-center space-x-2">
+                      <Tag size={18} />
+                      <span>Discount Applied</span>
+                    </p>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Discount Type</span>
+                        <span className="text-white font-medium capitalize">
+                          {discountInfo.discountType === 'percentage' 
+                            ? `${discountInfo.discountValue}% Off` 
+                            : `Fixed Amount`}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Discount Amount</span>
+                        <span className="text-yellow-400 font-medium">
+                          -{formatCurrency(discountInfo.discountAmount)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between pt-2 border-t border-yellow-500/20">
+                        <span className="text-gray-400">Original Room Charge</span>
+                        <span className="text-white font-medium line-through">
+                          {formatCurrency(discountInfo.originalRoomCharge)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white font-semibold">Discounted Room Charge</span>
+                        <span className="text-yellow-400 font-bold">
+                          {formatCurrency(discountInfo.discountedRoomCharge)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {guest.remarks && (
                   <div>
                     <p className="text-gray-400 text-sm mb-2">Special Requests & Remarks</p>
@@ -556,10 +1031,40 @@ export default function GuestDetails() {
 
             {bill && (
               <div className="space-y-4">
-                <div className="flex justify-between py-2 border-b border-dark-800">
-                  <span className="text-gray-400">Room Charges</span>
-                  <span className="text-white font-medium">{formatCurrency(bill.roomCharges)}</span>
-                </div>
+                {discountInfo ? (
+                  <>
+                    <div className="flex justify-between py-2 border-b border-dark-800">
+                      <span className="text-gray-400">Room Charges (Original)</span>
+                      <span className="text-white font-medium line-through">
+                        {formatCurrency(discountInfo.originalRoomCharge)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-dark-800">
+                      <span className="text-yellow-400 flex items-center space-x-1">
+                        <Tag size={16} />
+                        <span>
+                          Discount ({discountInfo.discountType === 'percentage' 
+                            ? `${discountInfo.discountValue}%` 
+                            : 'Fixed'})
+                        </span>
+                      </span>
+                      <span className="text-yellow-400 font-medium">
+                        -{formatCurrency(discountInfo.discountAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-dark-800">
+                      <span className="text-gray-400">Room Charges (After Discount)</span>
+                      <span className="text-white font-medium">
+                        {formatCurrency(discountInfo.discountedRoomCharge)}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between py-2 border-b border-dark-800">
+                    <span className="text-gray-400">Room Charges</span>
+                    <span className="text-white font-medium">{formatCurrency(bill.roomCharges)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-2 border-b border-dark-800">
                   <span className="text-gray-400">Additional Purchases</span>
                   <span className="text-white font-medium">{formatCurrency(bill.purchasesTotal)}</span>
