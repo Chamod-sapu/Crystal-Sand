@@ -5,7 +5,7 @@ import { generateGRCNumber } from '../utils/grcGenerator'
 import { calculateRoomCharges } from '../utils/calculations'
 import { getAvailableRoomsForDateRange } from '../utils/availability'
 import { format } from 'date-fns'
-import { Save, ArrowLeft, Plus, X, AlertCircle } from 'lucide-react'
+import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 'lucide-react'
 
 export default function NewGuest() {
   const navigate = useNavigate()
@@ -15,6 +15,9 @@ export default function NewGuest() {
   const [guests, setGuests] = useState([])
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
+  const [uploadedFile, setUploadedFile] = useState(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
   const [countries, setCountries] = useState([
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
     'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -78,7 +81,10 @@ export default function NewGuest() {
     advance_payment_amount: 0,
     advance_payment_date: format(new Date(), 'yyyy-MM-dd'),
     advance_payment_method: '',
-    remarks: ''
+    remarks: '',
+    passport_nic_document_url: '',
+    discount_type: '',
+    discount_amount: 0
   })
 
   useEffect(() => {
@@ -91,7 +97,6 @@ export default function NewGuest() {
   }, [formData.room_type, formData.date_of_arrival, formData.date_of_departure, allRooms, guests])
 
   useEffect(() => {
-    // Validate mobile number when nationality changes
     if (formData.mobile_number) {
       validateField('mobile_number', formData.mobile_number)
     }
@@ -139,6 +144,50 @@ export default function NewGuest() {
     }))
   }
 
+  async function handleFileUpload(event) {
+    const file = event.target.files[0]
+    
+    if (!file) return
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      setError('Please upload a PDF file only')
+      event.target.value = ''
+      return
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size must be less than 5MB')
+      event.target.value = ''
+      return
+    }
+
+    setError('')
+    
+    // Store file temporarily (will be uploaded with GRC number during form submission)
+    setUploadedFile({
+      name: file.name,
+      file: file,
+      size: file.size
+    })
+  }
+
+  async function handleRemoveFile() {
+    if (!uploadedFile) return
+
+    setUploadedFile(null)
+    setFormData(prev => ({
+      ...prev,
+      passport_nic_document_url: ''
+    }))
+    setUploadProgress(0)
+    
+    // Reset file input
+    const fileInput = document.getElementById('passport-upload')
+    if (fileInput) fileInput.value = ''
+  }
+
   function validateField(name, value) {
     const errors = { ...validationErrors }
     
@@ -157,9 +206,7 @@ export default function NewGuest() {
         if (!value.trim()) {
           errors[name] = 'Passport/NIC is required'
         } else {
-          // Validate passport format (e.g., A1234567, AB1234567, P1234567)
           const passportRegex = /^[A-Z][A-Z0-9]{6,12}$/
-          // Validate NIC format (e.g., 123456789V, 123456789X, 200012345678)
           const nicRegex = /^([0-9]{9}[VXvx]|[0-9]{12})$/
           
           if (!passportRegex.test(value) && !nicRegex.test(value.toUpperCase())) {
@@ -184,7 +231,6 @@ export default function NewGuest() {
         } else {
           let phoneRegex
           
-          // Different validation based on country
           switch (formData.nationality) {
             case 'Sri Lanka':
               phoneRegex = /^(\+94|0)(7[0-9]|8[1-8])[0-9]{7}$/
@@ -203,7 +249,6 @@ export default function NewGuest() {
               phoneRegex = /^(\+61|0)4\d{8}$/
               break
             default:
-              // Generic international format
               phoneRegex = /^(\+)?[1-9]\d{1,14}$/
           }
           
@@ -294,7 +339,6 @@ export default function NewGuest() {
       [name]: newValue
     }))
 
-    // Validate the field
     validateField(name, newValue)
 
     if (name.includes('date')) {
@@ -350,7 +394,6 @@ export default function NewGuest() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate all required fields
     const requiredFields = ['name_with_initials', 'passport_nic', 'nationality', 'mobile_number']
     let isValid = true
     
@@ -375,23 +418,75 @@ export default function NewGuest() {
 
     try {
       const grcNumber = await generateGRCNumber(supabase)
+      let documentUrl = ''
+
+      // Upload file with GRC number if file is selected
+      if (uploadedFile && uploadedFile.file) {
+        setIsUploading(true)
+        setUploadProgress(0)
+
+        try {
+          const timestamp = Date.now()
+          // Format: GRC-20260125-0003_1769340249244.pdf
+          const fileName = `${grcNumber}_${timestamp}.pdf`
+          const filePath = `documents/${fileName}`
+
+          const { data, error: uploadError } = await supabase.storage
+            .from('guest-documents')
+            .upload(filePath, uploadedFile.file, {
+              cacheControl: '3600',
+              upsert: false
+            })
+
+          if (uploadError) throw uploadError
+
+          documentUrl = data.path
+          setUploadProgress(100)
+        } catch (uploadError) {
+          console.error('Error uploading file:', uploadError)
+          setError('Failed to upload document, but continuing with registration.')
+          // Continue with registration even if upload fails
+        } finally {
+          setIsUploading(false)
+        }
+      }
 
       const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
-      const totalRoomCharge = selectedRooms.reduce((total, room) => {
+      let totalRoomCharge = selectedRooms.reduce((total, room) => {
+        let price = room.base_price || 0
+        if (room.discount_enabled) {
+          if (room.discount_type === 'percentage') {
+            price *= (1 - (room.discount_amount || 0) / 100)
+          } else if (room.discount_type === 'fixed') {
+            price -= (room.discount_amount || 0)
+          }
+          price = Math.max(0, price)
+        }
         const roomCharge = calculateRoomCharges(
           formData.date_of_arrival,
           formData.date_of_departure,
           1,
-          room.base_price || 0
+          price
         )
         return total + roomCharge
       }, 0)
+
+      // Apply guest-specific discount
+      if (formData.discount_type) {
+        if (formData.discount_type === 'percentage') {
+          totalRoomCharge *= (1 - formData.discount_amount / 100)
+        } else if (formData.discount_type === 'fixed') {
+          totalRoomCharge -= formData.discount_amount
+        }
+        totalRoomCharge = Math.max(0, totalRoomCharge)
+      }
 
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
           ...formData,
+          passport_nic_document_url: documentUrl,
           total_room_charge: totalRoomCharge,
           status: 'checked_in',
           created_at: new Date().toISOString(),
@@ -447,6 +542,14 @@ export default function NewGuest() {
         }))
       }
     }
+  }
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
   return (
@@ -556,6 +659,74 @@ export default function NewGuest() {
                   : 'Enter valid mobile number for ' + formData.nationality}
               </p>
             </div>
+          </div>
+
+          {/* Passport/NIC Document Upload */}
+          <div className="mt-6 pt-6 border-t border-dark-700">
+            <label className="label mb-3">Passport / NIC Document (PDF)</label>
+            
+            {!uploadedFile ? (
+              <div>
+                <label
+                  htmlFor="passport-upload"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                    isUploading 
+                      ? 'border-gray-600 bg-gray-800/50 cursor-not-allowed' 
+                      : 'border-dark-600 hover:border-primary-500 hover:bg-dark-800'
+                  }`}
+                >
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    {isUploading ? (
+                      <>
+                        <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mb-3" />
+                        <p className="text-sm text-gray-400">Uploading... {uploadProgress}%</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-10 h-10 mb-3 text-gray-400" />
+                        <p className="mb-2 text-sm text-gray-400">
+                          <span className="font-semibold">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-xs text-gray-500">PDF only (MAX. 5MB)</p>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    id="passport-upload"
+                    type="file"
+                    className="hidden"
+                    accept="application/pdf"
+                    onChange={handleFileUpload}
+                    disabled={isUploading || loading}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-4 bg-dark-800 rounded-lg border border-dark-700">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-primary-600/20 rounded-lg">
+                    <FileText className="w-6 h-6 text-primary-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{uploadedFile.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {formatFileSize(uploadedFile.size)} • Will be saved with GRC number
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveFile}
+                  className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                  disabled={loading}
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-2">
+              Upload a clear copy of the guest's passport or NIC for verification
+            </p>
           </div>
         </div>
 
@@ -951,6 +1122,45 @@ export default function NewGuest() {
         <div className="card p-6">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">6</span>
+            <span>Guest Discount (Optional)</span>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="label">Discount Type</label>
+              <select
+                name="discount_type"
+                value={formData.discount_type}
+                onChange={handleChange}
+                className="input-field"
+                disabled={loading}
+              >
+                <option value="">No Discount</option>
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed">Fixed Amount (LKR)</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Discount Amount</label>
+              <input
+                type="number"
+                name="discount_amount"
+                value={formData.discount_amount}
+                onChange={handleChange}
+                className="input-field"
+                min="0"
+                step={formData.discount_type === 'percentage' ? "0.1" : "100"}
+                disabled={!formData.discount_type || loading}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.discount_type === 'percentage' ? 'Enter percentage (0-100)' : 'Enter fixed amount in LKR'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-6">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">7</span>
             <span>Special Requests & Remarks</span>
           </h2>
           <div>

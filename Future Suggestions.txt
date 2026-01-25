@@ -1,3 +1,34 @@
-login
-Room add, Services CRUD [Rooms price change and other parameter changes]
-Menubar modifications
+In nationality, there should be a dropdown to select the nationality.
+All the inputs should be validate. [Passport / NIC Number - This should be validate. Mobile Number - This should be validate under the Nationality or country ]
+Reservation Number should be auto generated
+MenuBar modifications
+
+------------------------------------19/01/2026--------------------------------------------
+You did the great job. But I want these changes and upgrades further more. 
+
+1. Change room numbers to their room numbers
+2. Advance payment entering option should be in the guest feature when guest reservation for the future dates
+3. Meal plans - Room only meal plan should be in the meal plans
+4. Room types - Quadruple and Family four pack should be in the room types
+5. Room rates can be changed manually. Room rates can be change admin. It is suitable to develop a "Room" Feature to handle the operation in Rooms. Admin can be check the room availability from that feature also.
+6. There should be a remark option of guest feature to add special request from a guest
+7. There should be "Reservation forecast" added as a new feature.
+
+
+------------------------------------23/01/2026---------------------------------------------
+
+
+[ Done ] Add a booking calendar to dashboard identify the availability checking. When clicking on a date, all the bookings should be pop up using a popup. 
+[ Done ] Add search bar on top of the dashboard. All the rooms and room availability can be searched from that.
+[ Done ] Add a guest booking dates extend option. When a guest needs to stay more in the room, user can be extend the date. 
+[ Done ] Room numbers should be changed. In current version, dates can not be changed.
+[ Done ] Upload passport/NIC copies as PDF format into system when a new guest is been registered.
+[ Done ] Include a reservation chart in the Rooms feature. If this option click there should be a window popup. Download this chart also should be a new option. I have attached the format of reservation chart as a excel file.
+[ Done ] The user can add a room discount in the new guest feature when onboarding a new guest. This discount is only valid for the relevant guest.
+
+[   ] Give users privilege to manage payments (Super user)
+[   ] Normal users can add payments (Cannot adding, deleting payments)
+[   ] Beautify the alerts
+[   ] Room rate change option should have only the super user / manager can add a room discount
+[   ] All the users Activities should be displayed to super user. This is a new feature
+[   ] Only 7 users can get the access. If it is exceeding, there should be a payment for us.
