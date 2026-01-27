@@ -10,6 +10,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useState } from 'react'
+import logo from '../Images/Untitled design (2).png'
 
 export default function Layout({ children }) {
   const location = useLocation()
@@ -33,12 +34,7 @@ export default function Layout({ children }) {
     <div className="min-h-screen bg-dark-950">
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-dark-900 border-b border-dark-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">CS</span>
-          </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
-            Crystal Sand
-          </span>
+          <img src={logo} alt="Crystal Sand Logo" className="w-36" />
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -61,16 +57,8 @@ export default function Layout({ children }) {
         } lg:translate-x-0 bg-dark-900 border-r border-dark-800`}
       >
         <div className="flex flex-col h-full">
-          <div className="flex items-center space-x-3 px-6 py-6 border-b border-dark-800">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">CS</span>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary-400 to-primary-600 bg-clip-text text-transparent">
-                Crystal Sand
-              </h1>
-              <p className="text-xs text-gray-500">Hotel Management</p>
-            </div>
+          <div className="flex items-center space-x-3 px-1 py-1 border-b border-dark-800" >
+              <img src={logo} alt="Crystal Sand Logo" className="w-44"/>
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin">
@@ -97,8 +85,8 @@ export default function Layout({ children }) {
           <div className="px-6 py-4 border-t border-dark-800">
             <div className="text-xs text-gray-500">
               <p className="font-medium text-gray-400 mb-1">Crystal Sand Hotel</p>
-              <p>Coastal Road, Bentota</p>
-              <p>+94 34 227 5073</p>
+              <p>Sea Sound pvt ltd , No 26/8 ,De Seram Road , Mt.Lavinia</p>
+              <p>+9477 880 8099</p>
             </div>
           </div>
         </div>

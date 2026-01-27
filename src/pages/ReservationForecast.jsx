@@ -513,7 +513,7 @@ export default function ReservationForecast() {
             <h3 className="text-gray-400 text-sm font-medium">Occupancy Rate</h3>
             <TrendingUp className="text-primary-400" size={20} />
           </div>
-          <p className="text-3xl font-bold text-primary-400">{forecastData.occupancyPercentage}%</p>
+          <p className="text-xl font-bold text-primary-400">{forecastData.occupancyPercentage}%</p>
           <p className="text-xs text-gray-500 mt-2">Average occupancy in forecast period</p>
         </div>
 
@@ -522,7 +522,7 @@ export default function ReservationForecast() {
             <h3 className="text-gray-400 text-sm font-medium">Expected Revenue</h3>
             <DollarSign className="text-green-400" size={20} />
           </div>
-          <p className="text-3xl font-bold text-green-400">{formatCurrency(forecastData.expectedRevenue)}</p>
+          <p className="text-xl font-bold text-green-400">{formatCurrency(forecastData.expectedRevenue)}</p>
           <p className="text-xs text-gray-500 mt-2">From room charges only</p>
         </div>
 
@@ -531,7 +531,7 @@ export default function ReservationForecast() {
             <h3 className="text-gray-400 text-sm font-medium">Upcoming Reservations</h3>
             <Users className="text-blue-400" size={20} />
           </div>
-          <p className="text-3xl font-bold text-blue-400">{forecastData.upcomingReservations}</p>
+          <p className="text-xl font-bold text-blue-400">{forecastData.upcomingReservations}</p>
           <p className="text-xs text-gray-500 mt-2">In the next 60 days</p>
         </div>
 
@@ -540,7 +540,7 @@ export default function ReservationForecast() {
             <h3 className="text-gray-400 text-sm font-medium">Total Rooms</h3>
             <Calendar className="text-orange-400" size={20} />
           </div>
-          <p className="text-3xl font-bold text-orange-400">{rooms.length}</p>
+          <p className="text-xl font-bold text-orange-400">{rooms.length}</p>
           <p className="text-xs text-gray-500 mt-2">In property</p>
         </div>
       </div>
