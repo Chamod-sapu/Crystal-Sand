@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateGRCNumber } from '../utils/grcGenerator'
-import { calculateRoomCharges } from '../utils/calculations'
+import { calculateRoomCharges, formatCurrency } from '../utils/calculations'
 import { getAvailableRoomsForDateRange } from '../utils/availability'
 import { format } from 'date-fns'
 import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 'lucide-react'
@@ -452,41 +452,26 @@ export default function NewGuest() {
       }
 
       const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
-      let totalRoomCharge = selectedRooms.reduce((total, room) => {
-        let price = room.base_price || 0
-        if (room.discount_enabled) {
-          if (room.discount_type === 'percentage') {
-            price *= (1 - (room.discount_amount || 0) / 100)
-          } else if (room.discount_type === 'fixed') {
-            price -= (room.discount_amount || 0)
-          }
-          price = Math.max(0, price)
-        }
+      const totalRoomCharge = selectedRooms.reduce((total, room) => {
         const roomCharge = calculateRoomCharges(
           formData.date_of_arrival,
           formData.date_of_departure,
           1,
-          price
+          room.base_price || 0
         )
         return total + roomCharge
       }, 0)
-
-      // Apply guest-specific discount
-      if (formData.discount_type) {
-        if (formData.discount_type === 'percentage') {
-          totalRoomCharge *= (1 - formData.discount_amount / 100)
-        } else if (formData.discount_type === 'fixed') {
-          totalRoomCharge -= formData.discount_amount
-        }
-        totalRoomCharge = Math.max(0, totalRoomCharge)
-      }
 
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
           ...formData,
-          passport_nic_document_url: documentUrl,
+          // Convert empty strings to null for optional fields
+          advance_payment_method: formData.advance_payment_method || null,
+          discount_type: formData.discount_type || null,
+          voucher_number: formData.voucher_number || null,
+          passport_nic_document_url: documentUrl || null,
           total_room_charge: totalRoomCharge,
           status: 'checked_in',
           created_at: new Date().toISOString(),
@@ -551,6 +536,40 @@ export default function NewGuest() {
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
+
+  // Calculate room charges for display
+  const calculateDisplayCharges = () => {
+    if (formData.room_numbers.length === 0 || !formData.date_of_arrival || !formData.date_of_departure) {
+      return { originalRate: 0, discountAmount: 0, finalRate: 0 }
+    }
+
+    const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+    const originalRate = selectedRooms.reduce((total, room) => {
+      const roomCharge = calculateRoomCharges(
+        formData.date_of_arrival,
+        formData.date_of_departure,
+        1,
+        room.base_price || 0
+      )
+      return total + roomCharge
+    }, 0)
+
+    let discountAmount = 0
+    let finalRate = originalRate
+
+    if (formData.discount_type && formData.discount_amount > 0) {
+      if (formData.discount_type === 'percentage') {
+        discountAmount = (originalRate * formData.discount_amount) / 100
+      } else if (formData.discount_type === 'fixed') {
+        discountAmount = formData.discount_amount
+      }
+      finalRate = Math.max(0, originalRate - discountAmount)
+    }
+
+    return { originalRate, discountAmount, finalRate }
+  }
+
+  const displayCharges = calculateDisplayCharges()
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -1122,8 +1141,9 @@ export default function NewGuest() {
         <div className="card p-6">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">6</span>
-            <span>Guest Discount (Optional)</span>
+            <span>Discount (Optional)</span>
           </h2>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="label">Discount Type</label>
@@ -1149,13 +1169,63 @@ export default function NewGuest() {
                 className="input-field"
                 min="0"
                 step={formData.discount_type === 'percentage' ? "0.1" : "100"}
+                max={formData.discount_type === 'percentage' ? "100" : undefined}
                 disabled={!formData.discount_type || loading}
+                placeholder={formData.discount_type === 'percentage' ? '0-100' : '0'}
               />
               <p className="text-xs text-gray-500 mt-1">
-                {formData.discount_type === 'percentage' ? 'Enter percentage (0-100)' : 'Enter fixed amount in LKR'}
+                {formData.discount_type === 'percentage' ? 'Enter percentage (0-100)' : formData.discount_type === 'fixed' ? 'Enter fixed amount in LKR' : 'Select discount type first'}
               </p>
             </div>
           </div>
+
+          {/* Pricing Summary */}
+          {formData.room_numbers.length > 0 && formData.date_of_arrival && formData.date_of_departure && (
+            <div className="mt-6 pt-6 border-t border-dark-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Pricing Summary</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-dark-800 rounded-lg">
+                  <span className="text-gray-400">Original Room Rate</span>
+                  <span className="text-white font-bold text-lg">
+                    {formatCurrency(displayCharges.originalRate)}
+                  </span>
+                </div>
+                
+                {formData.discount_type && formData.discount_amount > 0 && (
+                  <>
+                    <div className="flex items-center justify-between p-3 bg-dark-800 rounded-lg">
+                      <span className="text-gray-400">
+                        Discount ({formData.discount_type === 'percentage' ? `${formData.discount_amount}%` : 'Fixed'})
+                      </span>
+                      <span className="text-red-400 font-bold">
+                        - {formatCurrency(displayCharges.discountAmount)}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 bg-primary-600/10 border border-primary-600/20 rounded-lg">
+                      <span className="text-white font-semibold text-lg">Final Amount</span>
+                      <span className="text-primary-400 font-bold text-2xl">
+                        {formatCurrency(displayCharges.finalRate)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                
+                {(!formData.discount_type || formData.discount_amount === 0) && (
+                  <div className="flex items-center justify-between p-4 bg-primary-600/10 border border-primary-600/20 rounded-lg">
+                    <span className="text-white font-semibold text-lg">Total Amount</span>
+                    <span className="text-primary-400 font-bold text-2xl">
+                      {formatCurrency(displayCharges.originalRate)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-xs text-gray-500 mt-4">
+                * Room rate calculated for {formData.room_numbers.length} room(s) from {format(new Date(formData.date_of_arrival), 'MMM dd')} to {format(new Date(formData.date_of_departure), 'MMM dd, yyyy')}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="card p-6">
