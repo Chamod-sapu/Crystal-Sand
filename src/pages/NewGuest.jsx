@@ -813,7 +813,7 @@ export default function NewGuest() {
                 { code: 'DBL', name: 'Double', desc: '2 Adults', maxAdults: 2, maxChildren: 1 },
                 { code: 'TPL', name: 'Triple', desc: '3 Adults', maxAdults: 3, maxChildren: 2 },
                 { code: 'QUAD', name: 'Quad', desc: '4 Adults', maxAdults: 4, maxChildren: 2 },
-                { code: 'FAMILY', name: 'Family', desc: '4+3 Children', maxAdults: 4, maxChildren: 3 },
+                { code: 'FAMILY', name: 'Family 5 Pax', desc: '4+3 Children', maxAdults: 4, maxChildren: 3 },
                 { code: '6PAX', name: '6 Pax', desc: '6+3 Children', maxAdults: 6, maxChildren: 3 }
               ].map(type => (
                 <button
