@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
+import logo from '../Images/Untitled design (2).png'
 
 export default function GuestDetails() {
   const { id } = useParams()
@@ -368,38 +369,45 @@ export default function GuestDetails() {
 
     const doc = new jsPDF()
 
-    doc.setFontSize(20)
-    doc.setFont('helvetica', 'bold')
-    doc.text(settings.hotel_name, 105, 20, { align: 'center' })
+    // Cyan color RGB: 8, 145, 178 (from Tailwind cyan-600)
+    const cyanColor = [8, 145, 178]
+
+    // Add logo instead of hotel name text
+    const logoWidth = 60
+    const logoHeight = 20
+    const logoX = (210 - logoWidth) / 2 // Center horizontally (A4 width is 210mm)
+    doc.addImage(logo, 'PNG', logoX, 10, logoWidth, logoHeight)
 
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(settings.hotel_address, 105, 28, { align: 'center' })
-    doc.text(`Tel: ${settings.hotel_phone} | Email: ${settings.hotel_email}`, 105, 34, { align: 'center' })
+    doc.text(settings.hotel_address, 105, 34, { align: 'center' })
+    doc.text(`Tel: ${settings.hotel_phone} | Email: ${settings.hotel_email}`, 105, 40, { align: 'center' })
 
+    // Apply cyan color to the line
+    doc.setDrawColor(...cyanColor)
     doc.setLineWidth(0.5)
-    doc.line(20, 38, 190, 38)
+    doc.line(20, 44, 190, 44)
 
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text('INVOICE', 105, 48, { align: 'center' })
+    doc.text('INVOICE', 105, 54, { align: 'center' })
 
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(`GRC Number: ${guest.grc_number}`, 20, 60)
-    doc.text(`Date: ${format(new Date(), 'dd MMM yyyy')}`, 150, 60)
+    doc.text(`GRC Number: ${guest.grc_number}`, 20, 66)
+    doc.text(`Date: ${format(new Date(), 'dd MMM yyyy')}`, 150, 66)
 
-    doc.text('Guest Details:', 20, 70)
-    doc.text(`Name: ${guest.name_with_initials}`, 20, 76)
-    doc.text(`Passport/NIC: ${guest.passport_nic}`, 20, 82)
-    doc.text(`Nationality: ${guest.nationality}`, 20, 88)
-    doc.text(`Mobile: ${guest.mobile_number}`, 20, 94)
+    doc.text('Guest Details:', 20, 76)
+    doc.text(`Name: ${guest.name_with_initials}`, 20, 82)
+    doc.text(`Passport/NIC: ${guest.passport_nic}`, 20, 88)
+    doc.text(`Nationality: ${guest.nationality}`, 20, 94)
+    doc.text(`Mobile: ${guest.mobile_number}`, 20, 100)
 
-    doc.text('Stay Details:', 120, 70)
-    doc.text(`Room(s): ${guest.room_numbers.join(', ')}`, 120, 76)
-    doc.text(`Check-in: ${format(new Date(guest.date_of_arrival), 'dd MMM yyyy')}`, 120, 82)
-    doc.text(`Check-out: ${format(new Date(guest.date_of_departure), 'dd MMM yyyy')}`, 120, 88)
-    doc.text(`Room Type: ${guest.room_type}`, 120, 94)
+    doc.text('Stay Details:', 120, 76)
+    doc.text(`Room(s): ${guest.room_numbers.join(', ')}`, 120, 82)
+    doc.text(`Check-in: ${format(new Date(guest.date_of_arrival), 'dd MMM yyyy')}`, 120, 88)
+    doc.text(`Check-out: ${format(new Date(guest.date_of_departure), 'dd MMM yyyy')}`, 120, 94)
+    doc.text(`Room Type: ${guest.room_type}`, 120, 100)
 
     const tableData = []
 
@@ -429,15 +437,15 @@ export default function GuestDetails() {
     })
 
     doc.autoTable({
-      startY: 105,
+      startY: 111,
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
       theme: 'striped',
-      headStyles: { fillColor: [193, 148, 64] },
+      headStyles: { fillColor: cyanColor },
       styles: { fontSize: 10 },
     })
 
-    const finalY = doc.lastAutoTable.finalY || 105
+    const finalY = doc.lastAutoTable.finalY || 111
 
     doc.setFontSize(10)
     doc.text('Subtotal:', 130, finalY + 10)
@@ -474,7 +482,7 @@ export default function GuestDetails() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-x-cyan-600"></div>
       </div>
     )
   }
