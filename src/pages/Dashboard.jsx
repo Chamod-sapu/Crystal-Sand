@@ -627,7 +627,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 2xl:grid-cols-6 gap-6">
         {statCards.map((stat, index) => (
           <div
             key={stat.title}
@@ -640,7 +640,7 @@ export default function Dashboard() {
               </div>
             </div>
             <h3 className="text-gray-400 text-sm font-medium">{stat.title}</h3>
-            <p className="text-2xl font-bold text-white mt-2">{stat.value}</p>
+            <p className="text-xl font-bold text-white mt-2">{stat.value}</p>
           </div>
         ))}
       </div>
