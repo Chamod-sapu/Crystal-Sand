@@ -85,7 +85,7 @@ export default function Layout({ children }) {
           <div className="px-6 py-4 border-t border-dark-800">
             <div className="text-xs text-gray-500">
               <p className="font-medium text-gray-400 mb-1">Crystal Sand Hotel</p>
-              <p>Sea Sound pvt ltd , No 26/8 ,De Seram Road , Mt.Lavinia</p>
+              <p>No 26/8 ,De Seram Road , Mt.Lavinia</p>
               <p>+9477 880 8099</p>
             </div>
           </div>
