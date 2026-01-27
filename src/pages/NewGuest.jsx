@@ -807,13 +807,14 @@ export default function NewGuest() {
           
           <div className="mb-6">
             <label className="label">Room Type <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
               {[
                 { code: 'SGL', name: 'Single', desc: '1 Adult', maxAdults: 1, maxChildren: 0 },
                 { code: 'DBL', name: 'Double', desc: '2 Adults', maxAdults: 2, maxChildren: 1 },
                 { code: 'TPL', name: 'Triple', desc: '3 Adults', maxAdults: 3, maxChildren: 2 },
                 { code: 'QUAD', name: 'Quad', desc: '4 Adults', maxAdults: 4, maxChildren: 2 },
-                { code: 'FAMILY', name: 'Family', desc: '4+3 Children', maxAdults: 4, maxChildren: 3 }
+                { code: 'FAMILY', name: 'Family', desc: '4+3 Children', maxAdults: 4, maxChildren: 3 },
+                { code: '6PAX', name: '6 Pax', desc: '6+3 Children', maxAdults: 6, maxChildren: 3 }
               ].map(type => (
                 <button
                   key={type.code}
