@@ -1,7 +1,9 @@
+// GuestDetails.jsx - Updated component (full code)
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { formatCurrency, calculateBillTotal } from '../utils/calculations'
+import { formatCurrency, calculateBillTotal, calculateDiscountInfo } from '../utils/calculations'
 import { format, differenceInDays, addDays, parseISO } from 'date-fns'
 import {
   ArrowLeft,
@@ -42,14 +44,12 @@ export default function GuestDetails() {
     unit_price: 0
   })
 
-  // Extend Stay states
   const [showExtendStay, setShowExtendStay] = useState(false)
   const [extendDate, setExtendDate] = useState('')
   const [extendLoading, setExtendLoading] = useState(false)
   const [extendError, setExtendError] = useState('')
   const [extendPreview, setExtendPreview] = useState(null)
 
-  // Document preview states
   const [showDocumentPreview, setShowDocumentPreview] = useState(false)
   const [documentUrl, setDocumentUrl] = useState(null)
   const [documentError, setDocumentError] = useState(null)
@@ -326,56 +326,38 @@ export default function GuestDetails() {
     }
   }
 
-  // Calculate discount information
-  function calculateDiscountInfo(guest) {
+  function getDiscountInfo(guest) {
     if (!guest.discount_type || !guest.discount_amount) {
       return null
     }
 
-    const discountedRoomCharge = parseFloat(guest.total_room_charge) || 0
-    let originalRoomCharge = discountedRoomCharge
-    let discountAmount = 0
-
-    if (guest.discount_type === 'percentage') {
-      // Reverse calculate: original = discounted / (1 - percentage/100)
-      originalRoomCharge = discountedRoomCharge / (1 - guest.discount_amount / 100)
-      discountAmount = originalRoomCharge - discountedRoomCharge
-    } else if (guest.discount_type === 'fixed') {
-      // Reverse calculate: original = discounted + fixed amount
-      originalRoomCharge = discountedRoomCharge + guest.discount_amount
-      discountAmount = guest.discount_amount
-    }
-
-    return {
-      originalRoomCharge,
-      discountAmount,
-      discountedRoomCharge,
-      discountType: guest.discount_type,
-      discountValue: guest.discount_amount
-    }
+    return calculateDiscountInfo(
+      guest.discount_type,
+      guest.discount_amount,
+      guest.total_room_charge
+    )
   }
 
   function generateInvoicePDF() {
     if (!guest || !settings) return
 
+    const discountInfo = getDiscountInfo(guest)
+
     const bill = calculateBillTotal(
       guest.total_room_charge,
       purchases,
       settings.tax_percentage,
-      guest.advance_payment_amount
+      guest.advance_payment_amount,
+      discountInfo
     )
-
-    const discountInfo = calculateDiscountInfo(guest)
 
     const doc = new jsPDF()
 
-    // Cyan color RGB: 8, 145, 178 (from Tailwind cyan-600)
     const cyanColor = [8, 145, 178]
 
-    // Add logo instead of hotel name text
     const logoWidth = 60
     const logoHeight = 20
-    const logoX = (210 - logoWidth) / 2 // Center horizontally (A4 width is 210mm)
+    const logoX = (210 - logoWidth) / 2
     doc.addImage(logo, 'PNG', logoX, 10, logoWidth, logoHeight)
 
     doc.setFontSize(10)
@@ -383,7 +365,6 @@ export default function GuestDetails() {
     doc.text(settings.hotel_address, 105, 34, { align: 'center' })
     doc.text(`Tel: ${settings.hotel_phone} | Email: ${settings.hotel_email}`, 105, 40, { align: 'center' })
 
-    // Apply cyan color to the line
     doc.setDrawColor(...cyanColor)
     doc.setLineWidth(0.5)
     doc.line(20, 44, 190, 44)
@@ -411,7 +392,6 @@ export default function GuestDetails() {
 
     const tableData = []
 
-    // Add room charges with discount info if applicable
     if (discountInfo) {
       tableData.push(['Room Charges (Original)', '', '', formatCurrency(discountInfo.originalRoomCharge)])
       tableData.push([
@@ -482,7 +462,7 @@ export default function GuestDetails() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-x-cyan-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
       </div>
     )
   }
@@ -495,13 +475,14 @@ export default function GuestDetails() {
     )
   }
 
+  const discountInfo = getDiscountInfo(guest)
   const bill = settings ? calculateBillTotal(
     guest.total_room_charge,
     purchases,
-    settings.tax_percentage
+    settings.tax_percentage,
+    guest.advance_payment_amount,
+    discountInfo
   ) : null
-
-  const discountInfo = calculateDiscountInfo(guest)
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -540,7 +521,6 @@ export default function GuestDetails() {
         </div>
       </div>
 
-      {/* Extend Stay Modal */}
       {showExtendStay && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
@@ -700,7 +680,6 @@ export default function GuestDetails() {
         </div>
       )}
 
-      {/* Document Preview Modal */}
       {showDocumentPreview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-dark-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">

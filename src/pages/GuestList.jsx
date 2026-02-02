@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { format } from 'date-fns'
-import { Search, UserPlus, Filter } from 'lucide-react'
+import { Search, UserPlus, Filter, LogIn } from 'lucide-react'
 
 export default function GuestList() {
+  const navigate = useNavigate()
   const [guests, setGuests] = useState([])
   const [filteredGuests, setFilteredGuests] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [checkingIn, setCheckingIn] = useState({})
 
   useEffect(() => {
     loadGuests()
@@ -54,6 +56,50 @@ export default function GuestList() {
     setFilteredGuests(filtered)
   }
 
+  async function handleCheckIn(guestId, roomNumbers) {
+    if (!confirm('Are you sure you want to check in this guest?')) return
+
+    setCheckingIn(prev => ({ ...prev, [guestId]: true }))
+
+    try {
+      // Update guest status to checked_in
+      const { error: guestError } = await supabase
+        .from('guests')
+        .update({ 
+          status: 'checked_in',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', guestId)
+
+      if (guestError) throw guestError
+
+      // Update room statuses to occupied
+      for (const roomNumber of roomNumbers) {
+        const { error: roomError } = await supabase
+          .from('rooms')
+          .update({ 
+            status: 'occupied',
+            updated_at: new Date().toISOString()
+          })
+          .eq('room_number', roomNumber)
+
+        if (roomError) {
+          console.error(`Failed to update room ${roomNumber}:`, roomError)
+        }
+      }
+
+      // Reload guests to reflect changes
+      await loadGuests()
+      
+      alert('Guest checked in successfully!')
+    } catch (error) {
+      console.error('Error checking in guest:', error)
+      alert('Failed to check in guest. Please try again.')
+    } finally {
+      setCheckingIn(prev => ({ ...prev, [guestId]: false }))
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -94,6 +140,7 @@ export default function GuestList() {
               className="input-field"
             >
               <option value="all">All Status</option>
+              <option value="reserved">Reserved</option>
               <option value="checked_in">Checked In</option>
               <option value="checked_out">Checked Out</option>
               <option value="cancelled">Cancelled</option>
@@ -118,12 +165,13 @@ export default function GuestList() {
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Check-in</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Check-out</th>
                 <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
+                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Action</th>
               </tr>
             </thead>
             <tbody>
               {filteredGuests.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="text-center py-12 text-gray-500">
+                  <td colSpan="8" className="text-center py-12 text-gray-500">
                     {searchTerm || statusFilter !== 'all'
                       ? 'No guests found matching your filters'
                       : 'No guests registered yet'}
@@ -167,14 +215,37 @@ export default function GuestList() {
                     </td>
                     <td className="py-4 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        guest.status === 'checked_in'
+                        guest.status === 'reserved'
+                          ? 'bg-blue-500/10 text-blue-400'
+                          : guest.status === 'checked_in'
                           ? 'bg-green-500/10 text-green-400'
                           : guest.status === 'checked_out'
                           ? 'bg-gray-500/10 text-gray-400'
                           : 'bg-red-500/10 text-red-400'
                       }`}>
-                        {guest.status.replace('_', ' ')}
+                        {guest.status === 'reserved' ? 'Reserved' : guest.status.replace('_', ' ')}
                       </span>
+                    </td>
+                    <td className="py-4 px-4">
+                      {guest.status === 'reserved' && (
+                        <button
+                          onClick={() => handleCheckIn(guest.id, guest.room_numbers)}
+                          disabled={checkingIn[guest.id]}
+                          className="btn-primary text-xs py-2 px-3 flex items-center space-x-1 disabled:opacity-50"
+                        >
+                          {checkingIn[guest.id] ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Processing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <LogIn size={14} />
+                              <span>Check In</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))

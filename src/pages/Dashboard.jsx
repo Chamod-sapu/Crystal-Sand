@@ -13,7 +13,8 @@ import {
   Search,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CalendarSearch
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../utils/calculations'
@@ -55,6 +56,13 @@ export default function Dashboard() {
   const [showDateModal, setShowDateModal] = useState(false)
   const [dateBookings, setDateBookings] = useState([])
 
+  // Time period availability states
+  const [showAvailabilityChecker, setShowAvailabilityChecker] = useState(false)
+  const [availabilityStartDate, setAvailabilityStartDate] = useState('')
+  const [availabilityEndDate, setAvailabilityEndDate] = useState('')
+  const [availableRoomsForPeriod, setAvailableRoomsForPeriod] = useState([])
+  const [availabilityLoading, setAvailabilityLoading] = useState(false)
+
   useEffect(() => {
     loadDashboardData()
   }, [])
@@ -67,6 +75,62 @@ export default function Dashboard() {
       setShowSearchResults(false)
     }
   }, [searchQuery, searchDate])
+
+  async function checkPeriodAvailability() {
+    if (!availabilityStartDate || !availabilityEndDate) {
+      return
+    }
+
+    const startDate = new Date(availabilityStartDate)
+    const endDate = new Date(availabilityEndDate)
+
+    if (startDate > endDate) {
+      alert('End date must be after start date')
+      return
+    }
+
+    setAvailabilityLoading(true)
+    
+    try {
+      // Get all guests with bookings that overlap with the selected period
+      const overlappingGuests = allGuests.filter(guest => {
+        if (guest.status === 'cancelled') return false
+        
+        const guestArrival = new Date(guest.date_of_arrival)
+        const guestDeparture = new Date(guest.date_of_departure)
+        
+        // Check if there's any overlap
+        return !(endDate < guestArrival || startDate > guestDeparture)
+      })
+
+      // Get all occupied room numbers during this period
+      const occupiedRoomNumbers = new Set()
+      overlappingGuests.forEach(guest => {
+        guest.room_numbers?.forEach(roomNum => occupiedRoomNumbers.add(roomNum))
+      })
+
+      // Find available rooms
+      const available = allRooms.map(room => ({
+        ...room,
+        isAvailable: !occupiedRoomNumbers.has(room.room_number),
+        occupiedBy: overlappingGuests.filter(g => 
+          g.room_numbers?.includes(room.room_number)
+        )
+      }))
+
+      setAvailableRoomsForPeriod(available)
+    } catch (error) {
+      console.error('Error checking availability:', error)
+    } finally {
+      setAvailabilityLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (availabilityStartDate && availabilityEndDate) {
+      checkPeriodAvailability()
+    }
+  }, [availabilityStartDate, availabilityEndDate, allGuests, allRooms])
 
   async function performSearch() {
     setSearchLoading(true)
@@ -409,14 +473,142 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-white">Dashboard</h1>
           <p className="text-gray-400 mt-1">Welcome to Crystal Sand Hotel Management</p>
         </div>
-        <Link
-          to="/guests/new"
-          className="inline-flex items-center space-x-2 btn-primary"
-        >
-          <UserPlus size={20} />
-          <span>New Guest</span>
-        </Link>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAvailabilityChecker(!showAvailabilityChecker)}
+            className="inline-flex items-center space-x-2 btn-secondary"
+          >
+            <CalendarSearch size={20} />
+            <span>Check Availability</span>
+          </button>
+          <Link
+            to="/guests/new"
+            className="inline-flex items-center space-x-2 btn-primary"
+          >
+            <UserPlus size={20} />
+            <span>New Guest</span>
+          </Link>
+        </div>
       </div>
+
+      {/* Period Availability Checker */}
+      {showAvailabilityChecker && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <CalendarSearch className="text-primary-400" size={20} />
+              <h2 className="text-lg font-semibold text-white">Room Availability for Time Period</h2>
+            </div>
+            <button
+              onClick={() => setShowAvailabilityChecker(false)}
+              className="text-gray-400 hover:text-white transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">
+                Start Date
+              </label>
+              <input
+                type="date"
+                value={availabilityStartDate}
+                onChange={(e) => setAvailabilityStartDate(e.target.value)}
+                className="input-field w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-2">
+                End Date
+              </label>
+              <input
+                type="date"
+                value={availabilityEndDate}
+                onChange={(e) => setAvailabilityEndDate(e.target.value)}
+                className="input-field w-full"
+              />
+            </div>
+          </div>
+
+          {availabilityStartDate && availabilityEndDate && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-md font-semibold text-white">
+                  Availability from {format(new Date(availabilityStartDate), 'MMM dd, yyyy')} to {format(new Date(availabilityEndDate), 'MMM dd, yyyy')}
+                </h3>
+                <div className="text-sm text-gray-400">
+                  <span className="text-green-400 font-semibold">
+                    {availableRoomsForPeriod.filter(r => r.isAvailable).length}
+                  </span>
+                  {' '}of {availableRoomsForPeriod.length} rooms available
+                </div>
+              </div>
+
+              {availabilityLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {availableRoomsForPeriod.map(room => (
+                    <div
+                      key={room.id}
+                      className={`p-4 rounded-lg border transition-all ${
+                        room.isAvailable
+                          ? 'bg-green-500/5 border-green-500/20 hover:bg-green-500/10'
+                          : 'bg-red-500/5 border-red-500/20 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-lg font-bold text-white">
+                          Room {room.room_number}
+                        </span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          room.isAvailable
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {room.isAvailable ? 'Available' : 'Occupied'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2 mb-3">
+                        <div className="text-sm text-gray-400">
+                          Type: <span className="text-gray-300">{room.room_type}</span>
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          Floor: <span className="text-gray-300">{room.floor || 1}</span>
+                        </div>
+                        <div className="text-sm text-primary-400 font-medium">
+                          {formatCurrency(room.base_price)}
+                        </div>
+                      </div>
+
+                      {!room.isAvailable && room.occupiedBy.length > 0 && (
+                        <div className="pt-3 border-t border-dark-700">
+                          <p className="text-xs text-gray-500 mb-2">Occupied by:</p>
+                          <div className="space-y-1">
+                            {room.occupiedBy.map(guest => (
+                              <div key={guest.id} className="text-xs">
+                                <p className="text-gray-300 font-medium">{guest.name_with_initials}</p>
+                                <p className="text-gray-500">
+                                  {format(new Date(guest.date_of_arrival), 'MMM dd')} - {format(new Date(guest.date_of_departure), 'MMM dd')}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Global Search Bar */}
       <div className="card p-6">

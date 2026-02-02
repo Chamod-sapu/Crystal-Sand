@@ -26,9 +26,23 @@ You did the great job. But I want these changes and upgrades further more.
 [ Done ] Include a reservation chart in the Rooms feature. If this option click there should be a window popup. Download this chart also should be a new option. I have attached the format of reservation chart as a excel file.
 [ Done ] The user can add a room discount in the new guest feature when onboarding a new guest. This discount is only valid for the relevant guest.
 
+
+
 [   ] Give users privilege to manage payments (Super user)
 [   ] Normal users can add payments (Cannot adding, deleting payments)
 [   ] Beautify the alerts
 [   ] Room rate change option should have only the super user / manager can add a room discount
 [   ] All the users Activities should be displayed to super user. This is a new feature
 [   ] Only 7 users can get the access. If it is exceeding, there should be a payment for us.
+[   ] Reservation Chart Need to add date range filter option to see available rooms.
+[   ] User name on Invoice
+
+
+------------------------------------30/01/2026---------------------------------------------
+
+[Done] Add an option to check the availability for a specific time period, as outlined below Room availability -  from 5 February to 7 February.
+[Done] There are two stages. Reservation & check in stages. First need to reserve the room. After guest arrived, the check in stage should be completed. In our system, after guest reserved the room, Reservation & check-in both stages are completed. So do it as two stages.
+[Done] Billing issue
+[Done] Guests adding function errors
+[Done] Room edit popup
+[Done] Reservation chart pdf download colors

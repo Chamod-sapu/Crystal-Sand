@@ -165,9 +165,57 @@ export default function ReservationForecast() {
     const monthStart = startOfMonth(chartMonth)
     const monthEnd = endOfMonth(chartMonth)
     const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
 
-    let csvContent = 'Room Number,Room Type,'
-    csvContent += days.map(day => format(day, 'dd')).join(',') + '\n'
+    // Create HTML table with styles for Excel
+    let htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Reservation Chart</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px; }
+          th { background-color: #c19440; color: white; font-weight: bold; }
+          .occupied { background-color: #ffd700; }
+          .available { background-color: #90ee90; }
+          .past { background-color: #d3d3d3; }
+          .room-header { background-color: #f0f0f0; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <h2>Crystal Sand Hotel - Reservation Chart - ${format(chartMonth, 'MMMM yyyy')}</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Room</th>
+              <th>Type</th>
+    `
+
+    days.forEach(day => {
+      const isPast = day < today
+      htmlContent += `<th style="${isPast ? 'background-color: #999; color: white;' : ''}">${format(day, 'dd')}<br/>${format(day, 'EEE')}</th>`
+    })
+
+    htmlContent += `
+            </tr>
+          </thead>
+          <tbody>
+    `
 
     const sortedRooms = [...rooms].sort((a, b) => {
       const numA = parseInt(a.room_number.replace(/\D/g, ''))
@@ -176,22 +224,45 @@ export default function ReservationForecast() {
     })
 
     sortedRooms.forEach(room => {
-      csvContent += `${room.room_number},${room.room_type},`
+      htmlContent += `
+            <tr>
+              <td class="room-header">${room.room_number}</td>
+              <td class="room-header">${room.room_type}</td>
+      `
       
-      const dayCells = days.map(day => {
+      days.forEach(day => {
         const dateStr = format(day, 'yyyy-MM-dd')
         const guest = getGuestForRoom(room.room_number, dateStr)
-        return guest ? `${guest.grc_number}` : ''
+        const isPast = day < today
+        const cellClass = isPast && !guest ? 'past' : guest ? 'occupied' : 'available'
+        const cellContent = guest ? guest.grc_number.split('-').pop() : ''
+        
+        htmlContent += `<td class="${cellClass}">${cellContent}</td>`
       })
       
-      csvContent += dayCells.join(',') + '\n'
+      htmlContent += `
+            </tr>
+      `
     })
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    htmlContent += `
+          </tbody>
+        </table>
+        <br/>
+        <p><strong>Legend:</strong></p>
+        <p><span style="background-color: #ffd700; padding: 5px; border: 1px solid #000;">Yellow</span> = Occupied | 
+           <span style="background-color: #90ee90; padding: 5px; border: 1px solid #000;">Green</span> = Available | 
+           <span style="background-color: #d3d3d3; padding: 5px; border: 1px solid #000;">Gray</span> = Past Date</p>
+        <p>Generated on: ${format(new Date(), 'PPpp')}</p>
+      </body>
+      </html>
+    `
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' })
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', `Reservation_Chart_${format(chartMonth, 'MMMM_yyyy')}.csv`)
+    link.setAttribute('download', `Reservation_Chart_${format(chartMonth, 'MMMM_yyyy')}.xls`)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -217,20 +288,86 @@ export default function ReservationForecast() {
       <head>
         <title>Reservation Chart - ${format(chartMonth, 'MMMM yyyy')}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1 { text-align: center; color: #333; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          th, td { border: 1px solid #ddd; padding: 4px; text-align: center; }
-          th { background-color: #c19440; color: white; font-weight: bold; }
-          .occupied { background-color: #ffd700; }
-          .available { background-color: #90ee90; }
-          .past { background-color: #d3d3d3; color: #888; }
-          .room-header { background-color: #f0f0f0; font-weight: bold; }
+          @media print {
+            @page { 
+              size: landscape;
+              margin: 0.5cm;
+            }
+            body { margin: 0; }
+          }
+          body { 
+            font-family: Arial, sans-serif; 
+            margin: 10px;
+          }
+          h1 { 
+            text-align: center; 
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 5px;
+          }
+          h2 { 
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 10px;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 9px;
+          }
+          th, td { 
+            border: 1px solid #000; 
+            padding: 3px; 
+            text-align: center;
+          }
+          th { 
+            background-color: #c19440; 
+            color: white; 
+            font-weight: bold;
+            font-size: 8px;
+          }
+          .occupied { 
+            background-color: #ffd700;
+            font-weight: bold;
+          }
+          .available { 
+            background-color: #90ee90; 
+          }
+          .past { 
+            background-color: #d3d3d3; 
+            color: #666;
+          }
+          .past-header {
+            background-color: #999;
+            color: white;
+          }
+          .room-header { 
+            background-color: #f0f0f0; 
+            font-weight: bold;
+          }
+          .legend {
+            margin-top: 10px;
+            font-size: 10px;
+          }
+          .legend-item {
+            display: inline-block;
+            margin-right: 15px;
+          }
+          .legend-box {
+            display: inline-block;
+            width: 20px;
+            height: 15px;
+            border: 1px solid #000;
+            vertical-align: middle;
+            margin-right: 5px;
+          }
         </style>
       </head>
       <body>
         <h1>Crystal Sand Hotel - Reservation Chart</h1>
-        <h2 style="text-align: center;">${format(chartMonth, 'MMMM yyyy')}</h2>
+        <h2>${format(chartMonth, 'MMMM yyyy')}</h2>
         <table>
           <thead>
             <tr>
@@ -238,7 +375,7 @@ export default function ReservationForecast() {
               <th>Type</th>
               ${days.map(day => {
                 const isPast = day < today
-                return `<th ${isPast ? 'style="background-color: #999;"' : ''}>${format(day, 'dd')}</th>`
+                return `<th class="${isPast ? 'past-header' : ''}">${format(day, 'dd')}<br/>${format(day, 'EEE')}</th>`
               }).join('')}
             </tr>
           </thead>
@@ -258,12 +395,21 @@ export default function ReservationForecast() {
             `).join('')}
           </tbody>
         </table>
-        <div style="margin-top: 20px;">
+        <div class="legend">
           <p><strong>Legend:</strong></p>
-          <p><span style="background-color: #ffd700; padding: 5px;">Yellow</span> = Occupied | 
-             <span style="background-color: #90ee90; padding: 5px;">Green</span> = Available | 
-             <span style="background-color: #d3d3d3; padding: 5px;">Gray</span> = Past Date</p>
-          <p>Generated on: ${format(new Date(), 'PPpp')}</p>
+          <div class="legend-item">
+            <span class="legend-box" style="background-color: #ffd700;"></span>
+            <span>Occupied</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-box" style="background-color: #90ee90;"></span>
+            <span>Available</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-box" style="background-color: #d3d3d3;"></span>
+            <span>Past Date</span>
+          </div>
+          <p style="margin-top: 10px; font-size: 9px;">Generated on: ${format(new Date(), 'PPpp')}</p>
         </div>
       </body>
       </html>
