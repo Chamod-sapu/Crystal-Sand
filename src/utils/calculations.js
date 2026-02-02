@@ -1,3 +1,5 @@
+// calculations.js - Updated functions
+
 import { differenceInDays, format } from 'date-fns'
 
 /**
@@ -62,6 +64,8 @@ export function calculateBillTotal(
 ) {
   const purchasesTotal = purchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
   const roomChargesAmount = parseFloat(roomCharges || 0)
+  
+  // Use the room charge as-is (it's already discounted if discount was applied)
   const subtotal = roomChargesAmount + purchasesTotal
   const tax = subtotal * (parseFloat(taxPercentage) / 100)
   const grandTotal = subtotal + tax
@@ -192,7 +196,7 @@ export function applyDiscount(baseAmount, discountType, discountValue) {
       finalAmount = amount - discountAmount
     }
   } else if (discountType === 'fixed') {
-    discountAmount = Math.min(discount, amount) // Can't discount more than the amount
+    discountAmount = Math.min(discount, amount)
     finalAmount = amount - discountAmount
   }
 
@@ -285,10 +289,8 @@ export function calculateRoomChargeBreakdown(
   const baseChargePerNight = parseFloat(pricePerNight) || 0
   const rooms = parseInt(numberOfRooms) || 1
 
-  // Calculate base charges
   const totalNightsCharge = nights * rooms * baseChargePerNight
 
-  // Apply discount if any
   const discountResult = applyDiscount(totalNightsCharge, discountType, discountValue)
 
   return {

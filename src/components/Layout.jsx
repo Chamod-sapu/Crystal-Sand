@@ -19,7 +19,6 @@ export default function Layout({ children }) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Guests', href: '/guests', icon: Users },
-    { name: 'New Guest', href: '/guests/new', icon: FileText },
     { name: 'Rooms', href: '/rooms', icon: Building2 },
     { name: 'Forecast', href: '/forecast', icon: TrendingUp },
   ]

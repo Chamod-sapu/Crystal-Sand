@@ -272,125 +272,137 @@ export default function Rooms() {
           <h1 className="text-3xl font-bold text-white">Rooms Management</h1>
           <p className="text-gray-400 mt-1">Manage hotel rooms and availability</p>
         </div>
-        {!showForm && (
-          <button
-            onClick={() => {
-              resetForm()
-              setShowForm(true)
-            }}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <Plus size={20} />
-            <span>Add Room</span>
-          </button>
-        )}
+        <button
+          onClick={() => {
+            resetForm()
+            setShowForm(true)
+          }}
+          className="btn-primary flex items-center space-x-2"
+        >
+          <Plus size={20} />
+          <span>Add Room</span>
+        </button>
       </div>
 
+      {/* Modal Popup for Add/Edit Room */}
       {showForm && (
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">
-              {editingRoom ? 'Edit Room' : 'Add New Room'}
-            </h2>
-            <button
-              onClick={resetForm}
-              className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {formError && (
-            <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start space-x-3">
-              <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
-              <p className="text-red-400 text-sm">{formError}</p>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-dark-800">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">
+                  {editingRoom ? 'Edit Room' : 'Add New Room'}
+                </h2>
+                <button
+                  onClick={resetForm}
+                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
             </div>
-          )}
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="label">Room Number *</label>
-              <input
-                type="text"
-                name="room_number"
-                value={formData.room_number}
-                onChange={handleInputChange}
-                className="input-field"
-                placeholder="e.g., 101, 202"
-                required
-              />
-              {editingRoom && (
-                <p className="text-xs text-yellow-400 mt-1">
-                  ⚠️ Changing room number will update all guest bookings
-                </p>
+            <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {formError && (
+                <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start space-x-3">
+                  <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+                  <p className="text-red-400 text-sm">{formError}</p>
+                </div>
               )}
-            </div>
 
-            <div>
-              <label className="label">Room Type *</label>
-              <select
-                name="room_type"
-                value={formData.room_type}
-                onChange={handleInputChange}
-                className="input-field"
-                required
-              >
-                {roomTypes.map(type => (
-                  <option key={type.code} value={type.code}>
-                    {type.name} ({type.code})
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="label">Room Number *</label>
+                  <input
+                    type="text"
+                    name="room_number"
+                    value={formData.room_number}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="e.g., 101, 202"
+                    required
+                  />
+                  {editingRoom && (
+                    <p className="text-xs text-yellow-400 mt-1">
+                      ⚠️ Changing room number will update all guest bookings
+                    </p>
+                  )}
+                </div>
 
-            <div>
-              <label className="label">Floor</label>
-              <input
-                type="number"
-                name="floor"
-                value={formData.floor}
-                onChange={handleInputChange}
-                className="input-field"
-                min="1"
-                max="10"
-              />
-            </div>
+                <div>
+                  <label className="label">Room Type *</label>
+                  <select
+                    name="room_type"
+                    value={formData.room_type}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    required
+                  >
+                    {roomTypes.map(type => (
+                      <option key={type.code} value={type.code}>
+                        {type.name} ({type.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div>
-              <label className="label">Base Price (LKR) *</label>
-              <input
-                type="number"
-                name="base_price"
-                value={formData.base_price}
-                onChange={handleInputChange}
-                className="input-field"
-                min="0"
-                step="100"
-                required
-              />
-            </div>
+                <div>
+                  <label className="label">Floor</label>
+                  <input
+                    type="number"
+                    name="floor"
+                    value={formData.floor}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    min="1"
+                    max="10"
+                  />
+                </div>
 
-            <div>
-              <label className="label">Status</label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="input-field"
-              >
-                <option value="available">Available</option>
-                <option value="occupied">Occupied</option>
-                <option value="maintenance">Maintenance</option>
-              </select>
-            </div>
+                <div>
+                  <label className="label">Base Price (LKR) *</label>
+                  <input
+                    type="number"
+                    name="base_price"
+                    value={formData.base_price}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    min="0"
+                    step="100"
+                    required
+                  />
+                </div>
 
-            <div className="flex items-end">
-              <button type="submit" className="btn-primary w-full flex items-center justify-center space-x-2">
-                <Save size={20} />
-                <span>{editingRoom ? 'Update Room' : 'Add Room'}</span>
-              </button>
-            </div>
-          </form>
+                <div className="md:col-span-2">
+                  <label className="label">Status</label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  >
+                    <option value="available">Available</option>
+                    <option value="occupied">Occupied</option>
+                    <option value="maintenance">Maintenance</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-dark-800">
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary flex items-center space-x-2">
+                  <Save size={20} />
+                  <span>{editingRoom ? 'Update Room' : 'Add Room'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

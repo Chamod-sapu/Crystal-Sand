@@ -18,6 +18,7 @@ export default function NewGuest() {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const [registrationType, setRegistrationType] = useState('reservation') // 'reservation' or 'checkin'
   const [countries, setCountries] = useState([
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
     'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -117,7 +118,7 @@ export default function NewGuest() {
       const { data: guestsData, error: guestsError } = await supabase
         .from('guests')
         .select('*')
-        .eq('status', 'checked_in')
+        .in('status', ['checked_in', 'reserved'])
         .gte('date_of_departure', today)
 
       if (guestsError) throw guestsError
@@ -462,6 +463,9 @@ export default function NewGuest() {
         return total + roomCharge
       }, 0)
 
+      // Determine status based on registration type
+      const guestStatus = registrationType === 'reservation' ? 'reserved' : 'checked_in'
+
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
@@ -473,7 +477,7 @@ export default function NewGuest() {
           voucher_number: formData.voucher_number || null,
           passport_nic_document_url: documentUrl || null,
           total_room_charge: totalRoomCharge,
-          status: 'checked_in',
+          status: guestStatus,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -482,23 +486,30 @@ export default function NewGuest() {
 
       if (guestError) throw guestError
 
-      for (const roomNumber of formData.room_numbers) {
-        const { error: roomError } = await supabase
-          .from('rooms')
-          .update({ 
-            status: 'occupied',
-            updated_at: new Date().toISOString()
-          })
-          .eq('room_number', roomNumber)
+      // Update room status only if checking in (not for reservation)
+      if (registrationType === 'checkin') {
+        for (const roomNumber of formData.room_numbers) {
+          const { error: roomError } = await supabase
+            .from('rooms')
+            .update({ 
+              status: 'occupied',
+              updated_at: new Date().toISOString()
+            })
+            .eq('room_number', roomNumber)
 
-        if (roomError) {
-          console.error(`Failed to update room ${roomNumber}:`, roomError)
+          if (roomError) {
+            console.error(`Failed to update room ${roomNumber}:`, roomError)
+          }
         }
       }
 
+      const successMessage = registrationType === 'reservation' 
+        ? 'Reservation created successfully!' 
+        : 'Guest checked in successfully!'
+
       navigate(`/guests/${guest.id}`, { 
         state: { 
-          message: 'Guest registered successfully!',
+          message: successMessage,
           guestName: formData.name_with_initials
         } 
       })
@@ -584,6 +595,62 @@ export default function NewGuest() {
         <div>
           <h1 className="text-3xl font-bold text-white">New Guest Registration</h1>
           <p className="text-gray-400 mt-1">Fill in guest details for check-in</p>
+        </div>
+      </div>
+
+      {/* Registration Type Selection */}
+      <div className="card p-6">
+        <h2 className="text-xl font-bold text-white mb-4">Registration Type</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button
+            type="button"
+            onClick={() => setRegistrationType('reservation')}
+            className={`p-6 rounded-lg border-2 transition-all text-left ${
+              registrationType === 'reservation'
+                ? 'border-primary-600 bg-primary-600/10'
+                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+            }`}
+            disabled={loading}
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                registrationType === 'reservation' ? 'border-primary-600' : 'border-dark-600'
+              }`}>
+                {registrationType === 'reservation' && (
+                  <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
+                )}
+              </div>
+              <span className="text-xl font-bold text-white">Reservation</span>
+            </div>
+            <p className="text-sm text-gray-400 ml-8">
+              Create a reservation for a future check-in. Rooms will be reserved but not marked as occupied.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setRegistrationType('checkin')}
+            className={`p-6 rounded-lg border-2 transition-all text-left ${
+              registrationType === 'checkin'
+                ? 'border-primary-600 bg-primary-600/10'
+                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+            }`}
+            disabled={loading}
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                registrationType === 'checkin' ? 'border-primary-600' : 'border-dark-600'
+              }`}>
+                {registrationType === 'checkin' && (
+                  <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
+                )}
+              </div>
+              <span className="text-xl font-bold text-white">Direct Check-in</span>
+            </div>
+            <p className="text-sm text-gray-400 ml-8">
+              Check-in guest immediately. Rooms will be marked as occupied and guest status will be "checked in".
+            </p>
+          </button>
         </div>
       </div>
 
@@ -1271,7 +1338,7 @@ export default function NewGuest() {
             ) : (
               <>
                 <Save size={20} />
-                <span>Register Guest</span>
+                <span>{registrationType === 'reservation' ? 'Create Reservation' : 'Check-in Guest'}</span>
               </>
             )}
           </button>
