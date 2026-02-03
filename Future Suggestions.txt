@@ -34,7 +34,6 @@ You did the great job. But I want these changes and upgrades further more.
 [   ] Room rate change option should have only the super user / manager can add a room discount
 [   ] All the users Activities should be displayed to super user. This is a new feature
 [   ] Only 7 users can get the access. If it is exceeding, there should be a payment for us.
-[   ] Reservation Chart Need to add date range filter option to see available rooms.
 [   ] User name on Invoice
 
 
@@ -46,3 +45,4 @@ You did the great job. But I want these changes and upgrades further more.
 [Done] Guests adding function errors
 [Done] Room edit popup
 [Done] Reservation chart pdf download colors
+[Done] Reservation Chart Need to add date range filter option to see available rooms.
