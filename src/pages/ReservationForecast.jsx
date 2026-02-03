@@ -33,6 +33,11 @@ export default function ReservationForecast() {
   const [chartMonth, setChartMonth] = useState(new Date())
   const [reservations, setReservations] = useState([])
   const [chartLoading, setChartLoading] = useState(false)
+  const [useCustomRange, setUseCustomRange] = useState(false)
+  const [customDateRange, setCustomDateRange] = useState({
+    start: format(new Date(), 'yyyy-MM-dd'),
+    end: format(addDays(new Date(), 30), 'yyyy-MM-dd')
+  })
 
   useEffect(() => {
     loadData()
@@ -46,7 +51,7 @@ export default function ReservationForecast() {
     if (showReservationChart) {
       loadReservations()
     }
-  }, [chartMonth, showReservationChart])
+  }, [chartMonth, showReservationChart, useCustomRange, customDateRange])
 
   async function loadData() {
     try {
@@ -70,8 +75,15 @@ export default function ReservationForecast() {
   async function loadReservations() {
     setChartLoading(true)
     try {
-      const monthStart = format(startOfMonth(chartMonth), 'yyyy-MM-dd')
-      const monthEnd = format(endOfMonth(chartMonth), 'yyyy-MM-dd')
+      let monthStart, monthEnd
+      
+      if (useCustomRange) {
+        monthStart = customDateRange.start
+        monthEnd = customDateRange.end
+      } else {
+        monthStart = format(startOfMonth(chartMonth), 'yyyy-MM-dd')
+        monthEnd = format(endOfMonth(chartMonth), 'yyyy-MM-dd')
+      }
 
       const { data } = await supabase
         .from('guests')
@@ -162,11 +174,24 @@ export default function ReservationForecast() {
   }
 
   const downloadAsExcel = () => {
-    const monthStart = startOfMonth(chartMonth)
-    const monthEnd = endOfMonth(chartMonth)
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    let monthStart, monthEnd, days
+    
+    if (useCustomRange) {
+      monthStart = new Date(customDateRange.start)
+      monthEnd = new Date(customDateRange.end)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    } else {
+      monthStart = startOfMonth(chartMonth)
+      monthEnd = endOfMonth(chartMonth)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    }
+    
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+
+    const chartTitle = useCustomRange 
+      ? `${format(monthStart, 'MMM dd, yyyy')} - ${format(monthEnd, 'MMM dd, yyyy')}`
+      : format(chartMonth, 'MMMM yyyy')
 
     // Create HTML table with styles for Excel
     let htmlContent = `
@@ -198,7 +223,7 @@ export default function ReservationForecast() {
         </style>
       </head>
       <body>
-        <h2>Crystal Sand Hotel - Reservation Chart - ${format(chartMonth, 'MMMM yyyy')}</h2>
+        <h2>Crystal Sand Hotel - Reservation Chart - ${chartTitle}</h2>
         <table>
           <thead>
             <tr>
@@ -262,7 +287,10 @@ export default function ReservationForecast() {
     const link = document.createElement('a')
     const url = URL.createObjectURL(blob)
     link.setAttribute('href', url)
-    link.setAttribute('download', `Reservation_Chart_${format(chartMonth, 'MMMM_yyyy')}.xls`)
+    const filename = useCustomRange 
+      ? `Reservation_Chart_${format(monthStart, 'MMM_dd_yyyy')}_to_${format(monthEnd, 'MMM_dd_yyyy')}.xls`
+      : `Reservation_Chart_${format(chartMonth, 'MMMM_yyyy')}.xls`
+    link.setAttribute('download', filename)
     link.style.visibility = 'hidden'
     document.body.appendChild(link)
     link.click()
@@ -270,11 +298,24 @@ export default function ReservationForecast() {
   }
 
   const downloadAsPDF = () => {
-    const monthStart = startOfMonth(chartMonth)
-    const monthEnd = endOfMonth(chartMonth)
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    let monthStart, monthEnd, days
+    
+    if (useCustomRange) {
+      monthStart = new Date(customDateRange.start)
+      monthEnd = new Date(customDateRange.end)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    } else {
+      monthStart = startOfMonth(chartMonth)
+      monthEnd = endOfMonth(chartMonth)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    }
+    
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+
+    const chartTitle = useCustomRange 
+      ? `${format(monthStart, 'MMM dd, yyyy')} - ${format(monthEnd, 'MMM dd, yyyy')}`
+      : format(chartMonth, 'MMMM yyyy')
 
     const sortedRooms = [...rooms].sort((a, b) => {
       const numA = parseInt(a.room_number.replace(/\D/g, ''))
@@ -286,7 +327,7 @@ export default function ReservationForecast() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Reservation Chart - ${format(chartMonth, 'MMMM yyyy')}</title>
+        <title>Reservation Chart - ${chartTitle}</title>
         <style>
           @media print {
             @page { 
@@ -367,7 +408,7 @@ export default function ReservationForecast() {
       </head>
       <body>
         <h1>Crystal Sand Hotel - Reservation Chart</h1>
-        <h2>${format(chartMonth, 'MMMM yyyy')}</h2>
+        <h2>${chartTitle}</h2>
         <table>
           <thead>
             <tr>
@@ -425,9 +466,18 @@ export default function ReservationForecast() {
   }
 
   const renderReservationChart = () => {
-    const monthStart = startOfMonth(chartMonth)
-    const monthEnd = endOfMonth(chartMonth)
-    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    let monthStart, monthEnd, days
+    
+    if (useCustomRange) {
+      monthStart = new Date(customDateRange.start)
+      monthEnd = new Date(customDateRange.end)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    } else {
+      monthStart = startOfMonth(chartMonth)
+      monthEnd = endOfMonth(chartMonth)
+      days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    }
+    
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
@@ -545,42 +595,118 @@ export default function ReservationForecast() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between">
+              {/* Date Range Toggle */}
+              <div className="mb-4">
                 <div className="flex items-center space-x-4">
                   <button
-                    onClick={() => setChartMonth(subMonths(chartMonth, 1))}
-                    className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                    onClick={() => setUseCustomRange(false)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      !useCustomRange 
+                        ? 'bg-primary-600 text-white' 
+                        : 'bg-dark-800 text-gray-400 hover:bg-dark-700'
+                    }`}
                   >
-                    <ChevronLeft size={20} className="text-gray-400" />
-                  </button>
-                  <span className="text-white font-medium text-lg min-w-[160px] text-center">
-                    {format(chartMonth, 'MMMM yyyy')}
-                  </span>
-                  <button
-                    onClick={() => setChartMonth(addMonths(chartMonth, 1))}
-                    className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
-                  >
-                    <ChevronRight size={20} className="text-gray-400" />
-                  </button>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={downloadAsExcel}
-                    className="btn-secondary flex items-center space-x-2 text-sm"
-                  >
-                    <FileDown size={16} />
-                    <span>Excel</span>
+                    Monthly View
                   </button>
                   <button
-                    onClick={downloadAsPDF}
-                    className="btn-secondary flex items-center space-x-2 text-sm"
+                    onClick={() => setUseCustomRange(true)}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      useCustomRange 
+                        ? 'bg-primary-600 text-white' 
+                        : 'bg-dark-800 text-gray-400 hover:bg-dark-700'
+                    }`}
                   >
-                    <Download size={16} />
-                    <span>PDF</span>
+                    Custom Range
                   </button>
                 </div>
               </div>
+
+              {/* Month Navigation or Custom Date Range */}
+              {!useCustomRange ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={() => setChartMonth(subMonths(chartMonth, 1))}
+                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                    >
+                      <ChevronLeft size={20} className="text-gray-400" />
+                    </button>
+                    <span className="text-white font-medium text-lg min-w-[160px] text-center">
+                      {format(chartMonth, 'MMMM yyyy')}
+                    </span>
+                    <button
+                      onClick={() => setChartMonth(addMonths(chartMonth, 1))}
+                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                    >
+                      <ChevronRight size={20} className="text-gray-400" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={downloadAsExcel}
+                      className="btn-secondary flex items-center space-x-2 text-sm"
+                    >
+                      <FileDown size={16} />
+                      <span>Excel</span>
+                    </button>
+                    <button
+                      onClick={downloadAsPDF}
+                      className="btn-secondary flex items-center space-x-2 text-sm"
+                    >
+                      <Download size={16} />
+                      <span>PDF</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label text-sm">Start Date</label>
+                      <input
+                        type="date"
+                        value={customDateRange.start}
+                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, start: e.target.value }))}
+                        className="input-field"
+                      />
+                    </div>
+                    <div>
+                      <label className="label text-sm">End Date</label>
+                      <input
+                        type="date"
+                        value={customDateRange.end}
+                        onChange={(e) => setCustomDateRange(prev => ({ ...prev, end: e.target.value }))}
+                        min={customDateRange.start}
+                        className="input-field"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-400">
+                      Showing: <span className="text-white font-medium">
+                        {format(new Date(customDateRange.start), 'MMM dd, yyyy')} - {format(new Date(customDateRange.end), 'MMM dd, yyyy')}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={downloadAsExcel}
+                        className="btn-secondary flex items-center space-x-2 text-sm"
+                      >
+                        <FileDown size={16} />
+                        <span>Excel</span>
+                      </button>
+                      <button
+                        onClick={downloadAsPDF}
+                        className="btn-secondary flex items-center space-x-2 text-sm"
+                      >
+                        <Download size={16} />
+                        <span>PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center space-x-6 mt-4 text-sm">
                 <div className="flex items-center space-x-2">

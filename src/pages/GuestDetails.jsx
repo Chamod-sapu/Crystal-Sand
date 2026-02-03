@@ -1,4 +1,4 @@
-// GuestDetails.jsx - Updated component (full code)
+// GuestDetails.jsx - Updated with Check-In functionality for Reserved guests
 
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -18,6 +18,7 @@ import {
   FileText,
   Printer,
   LogOut,
+  LogIn,
   CalendarPlus,
   AlertCircle,
   X,
@@ -300,6 +301,32 @@ export default function GuestDetails() {
     }
   }
 
+  async function handleCheckIn() {
+    if (!confirm('Are you sure you want to check in this guest?')) return
+
+    try {
+      const { error } = await supabase
+        .from('guests')
+        .update({ status: 'checked_in' })
+        .eq('id', id)
+
+      if (error) throw error
+
+      for (const roomNumber of guest.room_numbers) {
+        await supabase
+          .from('rooms')
+          .update({ status: 'occupied' })
+          .eq('room_number', roomNumber)
+      }
+
+      loadGuestData()
+      alert('Guest checked in successfully')
+    } catch (error) {
+      console.error('Error checking in:', error)
+      alert('Failed to check in guest')
+    }
+  }
+
   async function handleCheckout() {
     if (!confirm('Are you sure you want to check out this guest?')) return
 
@@ -500,6 +527,15 @@ export default function GuestDetails() {
           </div>
         </div>
         <div className="flex items-center space-x-3">
+          {guest.status === 'reserved' && (
+            <button
+              onClick={handleCheckIn}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <LogIn size={18} />
+              <span>Check In</span>
+            </button>
+          )}
           {guest.status === 'checked_in' && (
             <>
               <button
@@ -1006,13 +1042,15 @@ export default function GuestDetails() {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white">Billing Summary</h2>
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                guest.status === 'checked_in'
+                guest.status === 'reserved'
+                  ? 'bg-blue-500/10 text-blue-400'
+                  : guest.status === 'checked_in'
                   ? 'bg-green-500/10 text-green-400'
                   : guest.status === 'checked_out'
                   ? 'bg-gray-500/10 text-gray-400'
                   : 'bg-red-500/10 text-red-400'
               }`}>
-                {guest.status.replace('_', ' ')}
+                {guest.status === 'reserved' ? 'Reserved' : guest.status.replace('_', ' ')}
               </span>
             </div>
 
