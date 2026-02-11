@@ -8,7 +8,13 @@ import { differenceInDays, format } from 'date-fns'
 export function calculateRoomCharges(dateArrival, dateDeparture, numberOfRooms, pricePerNight) {
   const arrival = new Date(dateArrival)
   const departure = new Date(dateDeparture)
-  const nights = differenceInDays(departure, arrival)
+  let nights = differenceInDays(departure, arrival)
+  
+  // For same-day bookings, charge for 1 night
+  if (nights === 0 && dateArrival === dateDeparture) {
+    nights = 1
+  }
+  
   return nights * numberOfRooms * pricePerNight
 }
 
@@ -54,6 +60,7 @@ export function calculateDiscountInfo(discountType, discountAmount, discountedRo
 
 /**
  * Calculate bill total with optional discount information
+ * Tax is applied only to restaurant purchases
  */
 export function calculateBillTotal(
   roomCharges, 
@@ -62,12 +69,21 @@ export function calculateBillTotal(
   advancePayment = 0,
   discountInfo = null
 ) {
-  const purchasesTotal = purchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
   const roomChargesAmount = parseFloat(roomCharges || 0)
+  
+  // Separate restaurant and non-restaurant purchases
+  const restaurantPurchases = purchases.filter(p => p.category === 'restaurant')
+  const otherPurchases = purchases.filter(p => p.category !== 'restaurant')
+  
+  const restaurantTotal = restaurantPurchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
+  const otherPurchasesTotal = otherPurchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
+  const purchasesTotal = restaurantTotal + otherPurchasesTotal
+  
+  // Apply tax only to restaurant purchases
+  const tax = restaurantTotal * (parseFloat(taxPercentage) / 100)
   
   // Use the room charge as-is (it's already discounted if discount was applied)
   const subtotal = roomChargesAmount + purchasesTotal
-  const tax = subtotal * (parseFloat(taxPercentage) / 100)
   const grandTotal = subtotal + tax
   const advancePaymentAmount = parseFloat(advancePayment || 0)
   const balanceDue = grandTotal - advancePaymentAmount
@@ -75,8 +91,11 @@ export function calculateBillTotal(
   const result = {
     roomCharges: roomChargesAmount,
     purchasesTotal,
+    restaurantPurchasesTotal: restaurantTotal,
+    otherPurchasesTotal,
     subtotal,
     tax,
+    taxableAmount: restaurantTotal, // Only restaurant purchases are taxed
     grandTotal,
     advancePayment: advancePaymentAmount,
     balanceDue: Math.max(0, balanceDue),
@@ -154,10 +173,22 @@ export function calculateStayExtension(
   const arrivalDate = new Date(arrival)
   const currentDeparture = new Date(dateOfDeparture)
   const newDeparture = new Date(newDepartureDate)
-  const additionalNights = differenceInDays(newDeparture, currentDeparture)
+  
+  let newNights = differenceInDays(newDeparture, arrivalDate)
+  if (newNights === 0 && arrival === newDepartureDate) {
+    newNights = 1
+  }
+  
+  let additionalNights = differenceInDays(newDeparture, currentDeparture)
+  if (arrival === dateOfDeparture) {
+    // Original was same-day (1 night charge)
+    if (newDepartureDate > dateOfDeparture) {
+      additionalNights = Math.max(0, newNights - 1)
+    }
+  }
+
   const additionalCharge = pricePerNight * additionalNights * numberOfRooms
   const newTotalRoomCharge = parseFloat(totalRoomCharge) + additionalCharge
-  const newNights = differenceInDays(newDeparture, arrivalDate)
 
   return {
     currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -285,7 +316,13 @@ export function calculateRoomChargeBreakdown(
   discountType = null,
   discountValue = null
 ) {
-  const nights = differenceInDays(new Date(dateDeparture), new Date(dateArrival))
+  let nights = differenceInDays(new Date(dateDeparture), new Date(dateArrival))
+  
+  // For same-day bookings, charge for 1 night
+  if (nights === 0 && dateArrival === dateDeparture) {
+    nights = 1
+  }
+  
   const baseChargePerNight = parseFloat(pricePerNight) || 0
   const rooms = parseInt(numberOfRooms) || 1
 

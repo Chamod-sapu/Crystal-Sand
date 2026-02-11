@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateGRCNumber } from '../utils/grcGenerator'
 import { calculateRoomCharges, formatCurrency } from '../utils/calculations'
-import { getAvailableRoomsForDateRange } from '../utils/availability'
-import { format } from 'date-fns'
+import { format, differenceInDays } from 'date-fns'
 import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 'lucide-react'
 
 export default function NewGuest() {
@@ -18,7 +17,7 @@ export default function NewGuest() {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
-  const [registrationType, setRegistrationType] = useState('reservation') // 'reservation' or 'checkin'
+  const [registrationType, setRegistrationType] = useState('reservation')
   const [countries, setCountries] = useState([
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
     'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -95,7 +94,7 @@ export default function NewGuest() {
 
   useEffect(() => {
     updateAvailableRooms()
-  }, [formData.room_type, formData.date_of_arrival, formData.date_of_departure, allRooms, guests])
+  }, [formData.room_type, formData.date_of_arrival, formData.date_of_departure, formData.time_of_arrival, formData.time_of_departure, allRooms, guests])
 
   useEffect(() => {
     if (formData.mobile_number) {
@@ -150,14 +149,12 @@ export default function NewGuest() {
     
     if (!file) return
 
-    // Validate file type
     if (file.type !== 'application/pdf') {
       setError('Please upload a PDF file only')
       event.target.value = ''
       return
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError('File size must be less than 5MB')
       event.target.value = ''
@@ -166,7 +163,6 @@ export default function NewGuest() {
 
     setError('')
     
-    // Store file temporarily (will be uploaded with GRC number during form submission)
     setUploadedFile({
       name: file.name,
       file: file,
@@ -184,7 +180,6 @@ export default function NewGuest() {
     }))
     setUploadProgress(0)
     
-    // Reset file input
     const fileInput = document.getElementById('passport-upload')
     if (fileInput) fileInput.value = ''
   }
@@ -265,7 +260,10 @@ export default function NewGuest() {
       case 'number_of_adults':
         const maxAdults = formData.room_type === 'SGL' ? 1 : 
                          formData.room_type === 'DBL' ? 2 : 
-                         formData.room_type === 'TPL' ? 3 : 4
+                         formData.room_type === 'TPL' ? 3 : 
+                         formData.room_type === 'QUAD' ? 4 :
+                         formData.room_type === 'FAMILY' ? 4 :
+                         formData.room_type === '6PAX' ? 6 : 4
         if (value < 1 || value > maxAdults) {
           errors[name] = `Must be between 1 and ${maxAdults} for ${formData.room_type} room`
         } else {
@@ -276,7 +274,10 @@ export default function NewGuest() {
       case 'number_of_children':
         const maxChildren = formData.room_type === 'SGL' ? 0 : 
                            formData.room_type === 'DBL' ? 1 : 
-                           formData.room_type === 'TPL' ? 2 : 3
+                           formData.room_type === 'TPL' ? 2 : 
+                           formData.room_type === 'QUAD' ? 2 :
+                           formData.room_type === 'FAMILY' ? 3 :
+                           formData.room_type === '6PAX' ? 3 : 3
         if (value < 0 || value > maxChildren) {
           errors[name] = `Must be between 0 and ${maxChildren} for ${formData.room_type} room`
         } else {
@@ -292,6 +293,109 @@ export default function NewGuest() {
     return !errors[name]
   }
 
+  function checkTimeConflict(roomNumber, arrivalDate, departureDate, arrivalTime, departureTime) {
+    const conflictingGuests = guests.filter(guest => {
+      if (!guest.room_numbers?.includes(roomNumber)) return false
+      if (guest.status === 'cancelled') return false
+
+      const guestArrivalDate = new Date(guest.date_of_arrival)
+      const guestDepartureDate = new Date(guest.date_of_departure)
+      const newArrivalDate = new Date(arrivalDate)
+      const newDepartureDate = new Date(departureDate)
+
+      const datesOverlap = !(newDepartureDate < guestArrivalDate || newArrivalDate > guestDepartureDate)
+      
+      if (!datesOverlap) return false
+
+      const isSameDayBooking = arrivalDate === departureDate
+      const isGuestSameDayBooking = guest.date_of_arrival === guest.date_of_departure
+
+      // For same-day bookings, we need to check time conflicts
+      if (isSameDayBooking && isGuestSameDayBooking && arrivalDate === guest.date_of_arrival) {
+        // Both bookings are on the same day, check time overlap
+        const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
+        const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
+        const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
+        const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
+
+        const newArrMinutes = newArrHour * 60 + newArrMin
+        const newDepMinutes = newDepHour * 60 + newDepMin
+        const guestArrMinutes = guestArrHour * 60 + guestArrMin
+        const guestDepMinutes = guestDepHour * 60 + guestDepMin
+
+        // Check if time slots overlap
+        // No conflict if: new booking ends before or when existing starts, OR new booking starts at or after existing ends
+        const timeConflict = !(newDepMinutes <= guestArrMinutes || newArrMinutes >= guestDepMinutes)
+        return timeConflict
+      }
+
+      // If one is same-day and the other is not, check if they overlap on dates
+      if (isSameDayBooking && !isGuestSameDayBooking) {
+        // New booking is same-day, existing booking spans multiple days
+        // Check if the same-day booking falls within the existing booking period
+        if (arrivalDate >= guest.date_of_arrival && arrivalDate <= guest.date_of_departure) {
+          // The same-day booking is within the multi-day booking period
+          // Check if it's on the arrival day or departure day of the multi-day booking
+          if (arrivalDate === guest.date_of_arrival) {
+            // Same-day booking is on the arrival day of multi-day booking
+            const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
+            const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
+            const newArrMinutes = newArrHour * 60 + newArrMin
+            const guestArrMinutes = guestArrHour * 60 + guestArrMin
+            // Conflict if same-day booking starts at or after the multi-day booking arrival time
+            return newArrMinutes >= guestArrMinutes
+          } else if (arrivalDate === guest.date_of_departure) {
+            // Same-day booking is on the departure day of multi-day booking
+            const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
+            const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
+            const newDepMinutes = newDepHour * 60 + newDepMin
+            const guestDepMinutes = guestDepHour * 60 + guestDepMin
+            // Conflict if same-day booking ends after the multi-day booking departure time
+            return newDepMinutes > guestDepMinutes
+          } else {
+            // Same-day booking is in the middle of multi-day booking period
+            return true
+          }
+        }
+        return false
+      }
+
+      if (!isSameDayBooking && isGuestSameDayBooking) {
+        // Existing booking is same-day, new booking spans multiple days
+        // Check if the same-day existing booking falls within the new booking period
+        if (guest.date_of_arrival >= arrivalDate && guest.date_of_arrival <= departureDate) {
+          // The same-day existing booking is within the multi-day new booking period
+          if (guest.date_of_arrival === arrivalDate) {
+            // Same-day existing booking is on the arrival day of new multi-day booking
+            const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
+            const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
+            const newArrMinutes = newArrHour * 60 + newArrMin
+            const guestDepMinutes = guestDepHour * 60 + guestDepMin
+            // Conflict if new booking starts before existing same-day booking ends
+            return newArrMinutes < guestDepMinutes
+          } else if (guest.date_of_arrival === departureDate) {
+            // Same-day existing booking is on the departure day of new multi-day booking
+            const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
+            const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
+            const newDepMinutes = newDepHour * 60 + newDepMin
+            const guestArrMinutes = guestArrHour * 60 + guestArrMin
+            // Conflict if new booking ends after existing same-day booking starts
+            return newDepMinutes > guestArrMinutes
+          } else {
+            // Same-day existing booking is in the middle of new multi-day booking period
+            return true
+          }
+        }
+        return false
+      }
+
+      // Both are multi-day bookings, they conflict if dates overlap
+      return datesOverlap
+    })
+
+    return conflictingGuests
+  }
+
   function updateAvailableRooms() {
     if (!formData.date_of_arrival || !formData.date_of_departure) {
       setAvailableRooms([])
@@ -301,22 +405,40 @@ export default function NewGuest() {
     const arrival = new Date(formData.date_of_arrival)
     const departure = new Date(formData.date_of_departure)
     
-    if (departure <= arrival) {
+    if (departure < arrival) {
       setError('Departure date must be after arrival date')
       setAvailableRooms([])
       return
     }
 
+    if (formData.date_of_arrival === formData.date_of_departure) {
+      const [arrHour, arrMin] = formData.time_of_arrival.split(':').map(Number)
+      const [depHour, depMin] = formData.time_of_departure.split(':').map(Number)
+      const arrMinutes = arrHour * 60 + arrMin
+      const depMinutes = depHour * 60 + depMin
+
+      if (depMinutes <= arrMinutes) {
+        setError('Departure time must be after arrival time for same-day bookings')
+        setAvailableRooms([])
+        return
+      }
+    }
+
     setError('')
 
     try {
-      const available = getAvailableRoomsForDateRange(
-        allRooms,
-        guests,
-        formData.date_of_arrival,
-        formData.date_of_departure,
-        formData.room_type
-      )
+      const roomsByType = allRooms.filter(room => room.room_type === formData.room_type)
+
+      const available = roomsByType.filter(room => {
+        const conflicts = checkTimeConflict(
+          room.room_number,
+          formData.date_of_arrival,
+          formData.date_of_departure,
+          formData.time_of_arrival,
+          formData.time_of_departure
+        )
+        return conflicts.length === 0
+      })
 
       const sortedRooms = available.sort((a, b) => {
         const numA = parseInt(a.room_number.replace(/\D/g, ''))
@@ -342,7 +464,7 @@ export default function NewGuest() {
 
     validateField(name, newValue)
 
-    if (name.includes('date')) {
+    if (name.includes('date') || name.includes('time')) {
       setError('')
     }
   }
@@ -414,6 +536,21 @@ export default function NewGuest() {
       return
     }
 
+    for (const roomNumber of formData.room_numbers) {
+      const conflicts = checkTimeConflict(
+        roomNumber,
+        formData.date_of_arrival,
+        formData.date_of_departure,
+        formData.time_of_arrival,
+        formData.time_of_departure
+      )
+
+      if (conflicts.length > 0) {
+        setError(`Room ${roomNumber} has a time conflict with existing booking: ${conflicts[0].name_with_initials} (${conflicts[0].grc_number})`)
+        return
+      }
+    }
+
     setLoading(true)
     setError('')
 
@@ -421,14 +558,12 @@ export default function NewGuest() {
       const grcNumber = await generateGRCNumber(supabase)
       let documentUrl = ''
 
-      // Upload file with GRC number if file is selected
       if (uploadedFile && uploadedFile.file) {
         setIsUploading(true)
         setUploadProgress(0)
 
         try {
           const timestamp = Date.now()
-          // Format: GRC-20260125-0003_1769340249244.pdf
           const fileName = `${grcNumber}_${timestamp}.pdf`
           const filePath = `documents/${fileName}`
 
@@ -446,7 +581,6 @@ export default function NewGuest() {
         } catch (uploadError) {
           console.error('Error uploading file:', uploadError)
           setError('Failed to upload document, but continuing with registration.')
-          // Continue with registration even if upload fails
         } finally {
           setIsUploading(false)
         }
@@ -463,20 +597,26 @@ export default function NewGuest() {
         return total + roomCharge
       }, 0)
 
-      // Determine status based on registration type
       const guestStatus = registrationType === 'reservation' ? 'reserved' : 'checked_in'
+
+      const arrivalDate = new Date(formData.date_of_arrival)
+      const departureDate = new Date(formData.date_of_departure)
+      let numberOfNights = differenceInDays(departureDate, arrivalDate)
+      if (numberOfNights === 0 && formData.date_of_arrival === formData.date_of_departure) {
+        numberOfNights = 1
+      }
 
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
           ...formData,
-          // Convert empty strings to null for optional fields
           advance_payment_method: formData.advance_payment_method || null,
           discount_type: formData.discount_type || null,
           voucher_number: formData.voucher_number || null,
           passport_nic_document_url: documentUrl || null,
           total_room_charge: totalRoomCharge,
+          number_of_nights: numberOfNights,
           status: guestStatus,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -486,7 +626,6 @@ export default function NewGuest() {
 
       if (guestError) throw guestError
 
-      // Update room status only if checking in (not for reservation)
       if (registrationType === 'checkin') {
         for (const roomNumber of formData.room_numbers) {
           const { error: roomError } = await supabase
@@ -548,7 +687,6 @@ export default function NewGuest() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
-  // Calculate room charges for display
   const calculateDisplayCharges = () => {
     if (formData.room_numbers.length === 0 || !formData.date_of_arrival || !formData.date_of_departure) {
       return { originalRate: 0, discountAmount: 0, finalRate: 0 }
@@ -598,7 +736,6 @@ export default function NewGuest() {
         </div>
       </div>
 
-      {/* Registration Type Selection */}
       <div className="card p-6">
         <h2 className="text-xl font-bold text-white mb-4">Registration Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -747,7 +884,6 @@ export default function NewGuest() {
             </div>
           </div>
 
-          {/* Passport/NIC Document Upload */}
           <div className="mt-6 pt-6 border-t border-dark-700">
             <label className="label mb-3">Passport / NIC Document (PDF)</label>
             
@@ -865,7 +1001,6 @@ export default function NewGuest() {
           </div>
         </div>
 
-        {/* Room Selection Section */}
         <div className="card p-6">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">3</span>
@@ -928,7 +1063,6 @@ export default function NewGuest() {
             </div>
           </div>
 
-          {/* Room Selection Grid */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <label className="label">Select Room(s) <span className="text-red-500">*</span></label>
@@ -948,7 +1082,7 @@ export default function NewGuest() {
             ) : availableRooms.length > 0 ? (
               <>
                 <p className="text-sm text-gray-500 mb-3">
-                  Showing {availableRooms.length} available {formData.room_type} room(s)
+                  Showing {availableRooms.length} available {formData.room_type} room(s) for the selected time period
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {availableRooms.map(room => (
@@ -981,16 +1115,15 @@ export default function NewGuest() {
               <div className="card p-6 text-center">
                 <div className="text-red-400 mb-2">
                   <AlertCircle className="inline mr-2" size={20} />
-                  No available {formData.room_type} rooms for the selected dates
+                  No available {formData.room_type} rooms for the selected time period
                 </div>
                 <p className="text-sm text-gray-500">
-                  Try adjusting your dates or selecting a different room type
+                  Try adjusting your dates/times or selecting a different room type
                 </p>
               </div>
             )}
           </div>
 
-          {/* Occupancy Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="label">Number of Adults <span className="text-red-500">*</span></label>
@@ -1002,23 +1135,22 @@ export default function NewGuest() {
                   const value = parseInt(e.target.value) || 1
                   const maxAdults = formData.room_type === 'SGL' ? 1 : 
                                   formData.room_type === 'DBL' ? 2 : 
-                                  formData.room_type === 'TPL' ? 3 : 4
+                                  formData.room_type === 'TPL' ? 3 : 
+                                  formData.room_type === 'QUAD' ? 4 :
+                                  formData.room_type === 'FAMILY' ? 4 :
+                                  formData.room_type === '6PAX' ? 6 : 4
                   const adjustedValue = Math.min(Math.max(1, value), maxAdults)
                   setFormData(prev => ({ ...prev, number_of_adults: adjustedValue }))
                   validateField('number_of_adults', adjustedValue)
                 }}
                 className={`input-field ${validationErrors.number_of_adults ? 'border-red-500' : ''}`}
                 min="1"
-                max={formData.room_type === 'SGL' ? 1 : formData.room_type === 'DBL' ? 2 : formData.room_type === 'TPL' ? 3 : 4}
                 required
                 disabled={loading}
               />
               {validationErrors.number_of_adults && (
                 <p className="text-red-500 text-xs mt-1">{validationErrors.number_of_adults}</p>
               )}
-              <p className="text-xs text-gray-500 mt-1">
-                Max: {formData.room_type === 'SGL' ? 1 : formData.room_type === 'DBL' ? 2 : formData.room_type === 'TPL' ? 3 : 4} adults for {formData.room_type} room
-              </p>
             </div>
             <div>
               <label className="label">Number of Children</label>
@@ -1030,7 +1162,10 @@ export default function NewGuest() {
                   const value = parseInt(e.target.value) || 0
                   const maxChildren = formData.room_type === 'SGL' ? 0 : 
                                      formData.room_type === 'DBL' ? 1 : 
-                                     formData.room_type === 'TPL' ? 2 : 3
+                                     formData.room_type === 'TPL' ? 2 : 
+                                     formData.room_type === 'QUAD' ? 2 :
+                                     formData.room_type === 'FAMILY' ? 3 :
+                                     formData.room_type === '6PAX' ? 3 : 3
                   const adjustedValue = Math.min(Math.max(0, value), maxChildren)
                   setFormData(prev => ({ 
                     ...prev, 
@@ -1043,19 +1178,14 @@ export default function NewGuest() {
                 }}
                 className={`input-field ${validationErrors.number_of_children ? 'border-red-500' : ''}`}
                 min="0"
-                max={formData.room_type === 'SGL' ? 0 : formData.room_type === 'DBL' ? 1 : formData.room_type === 'TPL' ? 2 : 3}
                 disabled={loading}
               />
               {validationErrors.number_of_children && (
                 <p className="text-red-500 text-xs mt-1">{validationErrors.number_of_children}</p>
               )}
-              <p className="text-xs text-gray-500 mt-1">
-                Max: {formData.room_type === 'SGL' ? 0 : formData.room_type === 'DBL' ? 1 : formData.room_type === 'TPL' ? 2 : 3} children for {formData.room_type} room
-              </p>
             </div>
           </div>
 
-          {/* Children Ages */}
           {formData.number_of_children > 0 && (
             <div className="mt-6">
               <div className="flex items-center justify-between mb-3">
@@ -1118,13 +1248,14 @@ export default function NewGuest() {
               />
             </div>
             <div>
-              <label className="label">Time of Arrival</label>
+              <label className="label">Time of Arrival <span className="text-red-500">*</span></label>
               <input
                 type="time"
                 name="time_of_arrival"
                 value={formData.time_of_arrival}
                 onChange={handleChange}
                 className="input-field"
+                required
                 disabled={loading}
               />
               <p className="text-xs text-gray-500 mt-1">Standard check-in: 14:00 hrs</p>
@@ -1143,18 +1274,30 @@ export default function NewGuest() {
               />
             </div>
             <div>
-              <label className="label">Time of Departure</label>
+              <label className="label">Time of Departure <span className="text-red-500">*</span></label>
               <input
                 type="time"
                 name="time_of_departure"
                 value={formData.time_of_departure}
                 onChange={handleChange}
                 className="input-field"
+                required
                 disabled={loading}
               />
               <p className="text-xs text-gray-500 mt-1">Standard check-out: 12:00 hrs</p>
             </div>
           </div>
+          
+          {formData.date_of_arrival === formData.date_of_departure && (
+            <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <p className="text-blue-400 text-sm flex items-center space-x-2">
+                <AlertCircle size={16} />
+                <span>
+                  Same-day booking detected. Make sure arrival time ({formData.time_of_arrival}) is before departure time ({formData.time_of_departure}).
+                </span>
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="card p-6">
@@ -1247,7 +1390,6 @@ export default function NewGuest() {
             </div>
           </div>
 
-          {/* Pricing Summary */}
           {formData.room_numbers.length > 0 && formData.date_of_arrival && formData.date_of_departure && (
             <div className="mt-6 pt-6 border-t border-dark-700">
               <h3 className="text-lg font-semibold text-white mb-4">Pricing Summary</h3>
@@ -1290,7 +1432,7 @@ export default function NewGuest() {
               </div>
               
               <p className="text-xs text-gray-500 mt-4">
-                * Room rate calculated for {formData.room_numbers.length} room(s) from {format(new Date(formData.date_of_arrival), 'MMM dd')} to {format(new Date(formData.date_of_departure), 'MMM dd, yyyy')}
+                * Room rate calculated for {formData.room_numbers.length} room(s) from {format(new Date(formData.date_of_arrival), 'MMM dd')} {formData.time_of_arrival} to {format(new Date(formData.date_of_departure), 'MMM dd, yyyy')} {formData.time_of_departure}
               </p>
             </div>
           )}
