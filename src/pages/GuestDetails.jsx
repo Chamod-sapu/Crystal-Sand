@@ -188,11 +188,27 @@ export default function GuestDetails() {
     setExtendError('')
 
     const arrival = new Date(guest.date_of_arrival)
-    const newNights = differenceInDays(newDepartureDate, arrival)
-    const additionalNights = differenceInDays(newDepartureDate, currentDeparture)
+    let newNights = differenceInDays(newDepartureDate, arrival)
+    
+    // For same-day bookings, newNights should be at least 1
+    if (newNights === 0 && guest.date_of_arrival === extendDate) {
+      newNights = 1
+    }
+    
+    // If extending from same-day (which was 1 night) to 1-night stay (which is also 1 night), additionalNights is 0
+    let additionalNights = differenceInDays(newDepartureDate, currentDeparture)
+    if (guest.date_of_arrival === guest.date_of_departure) {
+      // It was a same-day room booking
+      if (newDepartureDate > currentDeparture) {
+        // If extending to next day, additional nights should be (total new nights - 1)
+        additionalNights = Math.max(0, newNights - 1)
+      }
+    }
     
     const numberOfRooms = guest.room_numbers.length
-    const pricePerNight = parseFloat(guest.total_room_charge) / (guest.number_of_nights * numberOfRooms) || 0
+    // Fallback for number_of_nights if it's 0 (legacy same-day bookings)
+    const effectiveNights = guest.number_of_nights || (guest.date_of_arrival === guest.date_of_departure ? 1 : 0)
+    const pricePerNight = parseFloat(guest.total_room_charge) / (effectiveNights * numberOfRooms) || 0
     const additionalCharge = pricePerNight * additionalNights * numberOfRooms
     const newTotalRoomCharge = parseFloat(guest.total_room_charge) + additionalCharge
 
@@ -458,22 +474,31 @@ export default function GuestDetails() {
     doc.text('Subtotal:', 130, finalY + 10)
     doc.text(formatCurrency(bill.subtotal), 180, finalY + 10, { align: 'right' })
 
-    doc.text(`Tax (${settings.tax_percentage}%):`, 130, finalY + 16)
-    doc.text(formatCurrency(bill.tax), 180, finalY + 16, { align: 'right' })
+    if (bill.tax > 0) {
+      doc.text(`Tax (${settings.tax_percentage}%):`, 130, finalY + 16)
+      doc.text(formatCurrency(bill.tax), 180, finalY + 16, { align: 'right' })
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'italic')
+      doc.text('(Applied to restaurant items only)', 130, finalY + 21)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+    }
 
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(12)
-    doc.text('Total:', 130, finalY + 24)
-    doc.text(formatCurrency(bill.grandTotal), 180, finalY + 24, { align: 'right' })
+    const totalY = bill.tax > 0 ? finalY + 29 : finalY + 18
+    doc.text('Total:', 130, totalY)
+    doc.text(formatCurrency(bill.grandTotal), 180, totalY, { align: 'right' })
 
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(10)
     if (bill.advancePayment > 0) {
-      doc.text('Advance Payment:', 130, finalY + 32)
-      doc.text(formatCurrency(bill.advancePayment), 180, finalY + 32, { align: 'right' })
+      const advanceY = bill.tax > 0 ? finalY + 37 : finalY + 26
+      doc.text('Advance Payment:', 130, advanceY)
+      doc.text(formatCurrency(bill.advancePayment), 180, advanceY, { align: 'right' })
       doc.setFont('helvetica', 'bold')
-      doc.text('Balance Due:', 130, finalY + 40)
-      doc.text(formatCurrency(bill.balanceDue), 180, finalY + 40, { align: 'right' })
+      doc.text('Balance Due:', 130, advanceY + 8)
+      doc.text(formatCurrency(bill.balanceDue), 180, advanceY + 8, { align: 'right' })
     }
 
     doc.setFont('helvetica', 'italic')
@@ -598,7 +623,9 @@ export default function GuestDetails() {
                   </div>
                   <div>
                     <p className="text-gray-400">Current Nights</p>
-                    <p className="text-white font-medium">{guest.number_of_nights}</p>
+                    <p className="text-white font-medium">
+                      {guest.number_of_nights || (guest.date_of_arrival === guest.date_of_departure ? 1 : 0)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-gray-400">Room(s)</p>
@@ -1090,18 +1117,37 @@ export default function GuestDetails() {
                     <span className="text-white font-medium">{formatCurrency(bill.roomCharges)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-dark-800">
-                  <span className="text-gray-400">Additional Purchases</span>
-                  <span className="text-white font-medium">{formatCurrency(bill.purchasesTotal)}</span>
-                </div>
+                {bill.restaurantPurchasesTotal > 0 && (
+                  <div className="flex justify-between py-2 border-b border-dark-800">
+                    <span className="text-gray-400">Restaurant Purchases</span>
+                    <span className="text-white font-medium">{formatCurrency(bill.restaurantPurchasesTotal)}</span>
+                  </div>
+                )}
+                {bill.otherPurchasesTotal > 0 && (
+                  <div className="flex justify-between py-2 border-b border-dark-800">
+                    <span className="text-gray-400">Other Purchases</span>
+                    <span className="text-white font-medium">{formatCurrency(bill.otherPurchasesTotal)}</span>
+                  </div>
+                )}
+                {bill.purchasesTotal === 0 && (
+                  <div className="flex justify-between py-2 border-b border-dark-800">
+                    <span className="text-gray-400">Additional Purchases</span>
+                    <span className="text-white font-medium">{formatCurrency(0)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-2 border-b border-dark-800">
                   <span className="text-gray-400">Subtotal</span>
                   <span className="text-white font-medium">{formatCurrency(bill.subtotal)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-dark-800">
-                  <span className="text-gray-400">Tax ({settings?.tax_percentage}%)</span>
-                  <span className="text-white font-medium">{formatCurrency(bill.tax)}</span>
-                </div>
+                {bill.tax > 0 && (
+                  <div className="flex justify-between py-2 border-b border-dark-800">
+                    <span className="text-gray-400 flex flex-col">
+                      <span>Tax ({settings?.tax_percentage}%)</span>
+                      <span className="text-xs text-gray-500">Applied to restaurant items only</span>
+                    </span>
+                    <span className="text-white font-medium">{formatCurrency(bill.tax)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between py-3 bg-primary-600/10 rounded-lg px-3">
                   <span className="text-white font-bold text-lg">Grand Total</span>
                   <span className="text-primary-400 font-bold text-lg">{formatCurrency(bill.grandTotal)}</span>
