@@ -11,6 +11,7 @@ export default function GuestList() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('')
   const [checkingIn, setCheckingIn] = useState({})
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function GuestList() {
 
   useEffect(() => {
     filterGuests()
-  }, [searchTerm, statusFilter, guests])
+  }, [searchTerm, statusFilter, dateFilter, guests])
 
   async function loadGuests() {
     try {
@@ -50,6 +51,13 @@ export default function GuestList() {
         g.name_with_initials.toLowerCase().includes(term) ||
         g.passport_nic.toLowerCase().includes(term) ||
         g.mobile_number.includes(term)
+      )
+    }
+
+    if (dateFilter) {
+      filtered = filtered.filter(g => 
+        g.date_of_arrival === dateFilter || 
+        g.date_of_departure === dateFilter
       )
     }
 
@@ -146,6 +154,23 @@ export default function GuestList() {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
+          <div className="sm:w-48">
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="input-field"
+              placeholder="Filter by date..."
+            />
+          </div>
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter('')}
+              className="text-sm text-primary-400 hover:text-primary-300 transition-colors px-2"
+            >
+              Clear Date
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-between mb-4 text-sm">

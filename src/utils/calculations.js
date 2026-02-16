@@ -79,8 +79,8 @@ export function calculateBillTotal(
   const otherPurchasesTotal = otherPurchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
   const purchasesTotal = restaurantTotal + otherPurchasesTotal
   
-  // Apply tax only to restaurant purchases
-  const tax = restaurantTotal * (parseFloat(taxPercentage) / 100)
+  // No tax applied to purchases
+  const tax = 0
   
   // Use the room charge as-is (it's already discounted if discount was applied)
   const subtotal = roomChargesAmount + purchasesTotal
