@@ -429,7 +429,7 @@ export default function NewGuest() {
     try {
       const roomsByType = allRooms.filter(room => room.room_type === formData.room_type)
 
-      const available = roomsByType.filter(room => {
+      const roomsWithStatus = roomsByType.map(room => {
         const conflicts = checkTimeConflict(
           room.room_number,
           formData.date_of_arrival,
@@ -437,10 +437,13 @@ export default function NewGuest() {
           formData.time_of_arrival,
           formData.time_of_departure
         )
-        return conflicts.length === 0
+        return {
+          ...room,
+          isOccupied: conflicts.length > 0
+        }
       })
 
-      const sortedRooms = available.sort((a, b) => {
+      const sortedRooms = roomsWithStatus.sort((a, b) => {
         const numA = parseInt(a.room_number.replace(/\D/g, ''))
         const numB = parseInt(b.room_number.replace(/\D/g, ''))
         return numA - numB
@@ -1082,26 +1085,33 @@ export default function NewGuest() {
             ) : availableRooms.length > 0 ? (
               <>
                 <p className="text-sm text-gray-500 mb-3">
-                  Showing {availableRooms.length} available {formData.room_type} room(s) for the selected time period
+                  Showing all {availableRooms.length} {formData.room_type} room(s). Available rooms can be selected.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {availableRooms.map(room => (
                     <button
                       key={room.id}
                       type="button"
-                      onClick={() => handleRoomSelection(room.room_number)}
+                      onClick={() => !room.isOccupied && handleRoomSelection(room.room_number)}
                       className={`p-4 rounded-lg border-2 transition-all relative ${
                         formData.room_numbers.includes(room.room_number)
                           ? 'border-primary-600 bg-primary-600/20 text-white shadow-lg shadow-primary-600/20'
+                          : room.isOccupied
+                          ? 'border-red-900/50 bg-red-900/10 text-red-400 opacity-60 cursor-not-allowed'
                           : 'border-dark-700 hover:border-primary-500/50 text-gray-400 hover:bg-dark-800'
                       }`}
-                      disabled={loading}
+                      disabled={loading || room.isOccupied}
                     >
                       <div className="font-bold text-lg">{room.room_number}</div>
                       <div className="text-xs mt-1">Floor {room.floor || 1}</div>
                       <div className="text-xs opacity-75 mt-1">
                         LKR {room.base_price?.toLocaleString() || '0'}
                       </div>
+                      {room.isOccupied && (
+                        <div className="text-[10px] uppercase font-bold text-red-500 mt-1">
+                          Occupied
+                        </div>
+                      )}
                       {formData.room_numbers.includes(room.room_number) && (
                         <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center animate-pulse">
                           <div className="w-3 h-3 bg-white rounded-full" />

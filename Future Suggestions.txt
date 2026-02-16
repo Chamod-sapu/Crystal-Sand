@@ -46,3 +46,11 @@ You did the great job. But I want these changes and upgrades further more.
 [Done] Room edit popup
 [Done] Reservation chart pdf download colors
 [Done] Reservation Chart Need to add date range filter option to see available rooms.
+
+
+------------------------------------16/02/2026---------------------------------------------
+[Done] Remove 10% Tax from the billing from meal plan and addtional restuarant items
+[Done] Date vise filter should be added to the guest management. @GuestList.jsx
+[Done] Show all the rooms in the room selection when a guest reservation. Selected rooms and non-selected rooms should be identified. @NewGuest.jsx
+
+
