@@ -6,6 +6,7 @@ import NewGuest from './pages/NewGuest'
 import GuestDetails from './pages/GuestDetails'
 import Rooms from './pages/Rooms'
 import ReservationForecast from './pages/ReservationForecast'
+import FoodBeverage from './pages/FoodBeverage'
 
 function App() {
   return (
@@ -15,11 +16,10 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/guests" element={<GuestList />} />
           <Route path="/guests/new" element={<NewGuest />} />
-          {/* Make sure this route matches what you're navigating to */}
           <Route path="/guests/:id" element={<GuestDetails />} />
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/forecast" element={<ReservationForecast />} />
-          {/* Add a catch-all route for debugging */}
+          <Route path="/food-beverage" element={<FoodBeverage />} />
           <Route path="*" element={<div>404 - Page not found</div>} />
         </Routes>
       </Layout>

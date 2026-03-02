@@ -7,7 +7,8 @@ import {
   Menu,
   X,
   Building2,
-  TrendingUp
+  TrendingUp,
+  Coffee
 } from 'lucide-react'
 import { useState } from 'react'
 import logo from '../Images/Untitled design (2).png'
@@ -20,6 +21,7 @@ export default function Layout({ children }) {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Guests', href: '/guests', icon: Users },
     { name: 'Rooms', href: '/rooms', icon: Building2 },
+    { name: 'F & B', href: '/food-beverage', icon: Coffee },
     { name: 'Forecast', href: '/forecast', icon: TrendingUp },
   ]
 
