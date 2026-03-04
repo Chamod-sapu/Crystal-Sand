@@ -30,6 +30,7 @@ export default function Rooms() {
     status: 'available'
   })
   const [filterStatus, setFilterStatus] = useState('all')
+  const [searchGRC, setSearchGRC] = useState('')
   const [formError, setFormError] = useState('')
 
   useEffect(() => {
@@ -242,9 +243,11 @@ export default function Rooms() {
     setFormError('')
   }
 
-  const filteredRooms = filterStatus === 'all'
-    ? rooms
-    : rooms.filter(room => room.status === filterStatus)
+  const filteredRooms = rooms.filter(room => {
+    const matchesStatus = filterStatus === 'all' || room.status === filterStatus
+    const matchesSearch = !searchGRC || room.room_number.toLowerCase().includes(searchGRC.toLowerCase())
+    return matchesStatus && matchesSearch
+  })
 
   const roomTypeMap = Object.fromEntries(roomTypes.map(rt => [rt.code, rt.name]))
 
@@ -280,7 +283,7 @@ export default function Rooms() {
           className="btn-primary flex items-center space-x-2"
         >
           <Plus size={20} />
-          <span>Add Room</span>
+          <span>New Room </span>
         </button>
       </div>
 
@@ -406,6 +409,38 @@ export default function Rooms() {
         </div>
       )}
 
+      {/* Search and Filter Section */}
+      <div className="card p-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex-1 w-full md:max-w-md">
+            <input
+              type="text"
+              placeholder="Enter GRC Number"
+              value={searchGRC}
+              onChange={(e) => setSearchGRC(e.target.value)}
+              className="input-field w-full"
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-green-500 rounded"></div>
+                <span className="text-sm text-gray-300">Available</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-500 rounded"></div>
+                <span className="text-sm text-gray-300">Occupied</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-yellow-500 rounded"></div>
+                <span className="text-sm text-gray-300">Reserved</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {roomTypes.map(type => {
           const stats = statsByType[type.code] || { count: 0, occupied: 0, available: 0 }
@@ -431,93 +466,89 @@ export default function Rooms() {
         })}
       </div>
 
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">All Rooms</h2>
-          <div className="flex items-center space-x-2">
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="input-field text-sm"
-            >
-              <option value="all">All Status</option>
-              <option value="available">Available</option>
-              <option value="occupied">Occupied</option>
-              <option value="maintenance">Maintenance</option>
-            </select>
+      {/* Room Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {filteredRooms.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            No rooms found
           </div>
-        </div>
+        ) : (
+          filteredRooms.map(room => (
+            <div
+              key={room.id}
+              className={`card p-5 border-2 transition-all hover:shadow-lg ${
+                room.status === 'available'
+                  ? 'border-green-500'
+                  : room.status === 'occupied'
+                  ? 'border-red-500'
+                  : 'border-yellow-500'
+              }`}
+            >
+              <div className="space-y-3">
+                {/* Room Number */}
+                <div className="text-center border-b border-dark-700 pb-3">
+                  <h3 className="text-2xl font-bold text-white">Room {room.room_number}</h3>
+                </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Room</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Type</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Floor</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Base Price</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRooms.length === 0 ? (
-                <tr>
-                  <td colSpan="6" className="text-center py-8 text-gray-500">
-                    No rooms found
-                  </td>
-                </tr>
-              ) : (
-                filteredRooms.map(room => (
-                  <tr
-                    key={room.id}
-                    className="border-b border-dark-800 hover:bg-dark-800/50 transition-colors"
-                  >
-                    <td className="py-4 px-4">
-                      <span className="text-white font-bold text-lg">{room.room_number}</span>
-                    </td>
-                    <td className="py-4 px-4 text-gray-300">
+                {/* Room Details */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Type</span>
+                    <span className="text-white font-medium">
                       {roomTypeMap[room.room_type] || room.room_type}
-                    </td>
-                    <td className="py-4 px-4 text-gray-300">
-                      Floor {room.floor || 1}
-                    </td>
-                    <td className="py-4 px-4 text-primary-400 font-medium">
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Floor</span>
+                    <span className="text-white font-medium">Floor {room.floor || 1}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Base Price</span>
+                    <span className="text-primary-400 font-bold">
                       {formatCurrency(room.base_price)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        room.status === 'available'
-                          ? 'bg-green-500/10 text-green-400'
-                          : room.status === 'occupied'
-                          ? 'bg-orange-500/10 text-orange-400'
-                          : 'bg-red-500/10 text-red-400'
-                      }`}>
-                        {room.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleEdit(room)}
-                          className="p-2 hover:bg-dark-700 rounded-lg text-primary-400 transition-colors"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(room.id)}
-                          className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400">Status</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      room.status === 'available'
+                        ? 'bg-green-500/20 text-green-400'
+                        : room.status === 'occupied'
+                        ? 'bg-red-500/20 text-red-400'
+                        : 'bg-yellow-500/20 text-yellow-400'
+                    }`}>
+                      {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="pt-3 border-t border-dark-700">
+                  <div className="text-gray-400 text-xs mb-2">Actions</div>
+                  <div className="flex items-center justify-center space-x-2">
+                    <button
+                      onClick={() => handleEdit(room)}
+                      className="flex-1 flex items-center justify-center space-x-1 p-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors text-sm"
+                    >
+                      <Edit2 size={16} />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(room.id)}
+                      className="flex-1 flex items-center justify-center space-x-1 p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm"
+                    >
+                      <Trash2 size={16} />
+                      <span>Delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )
