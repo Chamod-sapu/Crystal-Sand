@@ -407,6 +407,116 @@ export default function Dashboard() {
     )
   }
 
+  const isRoomOccupied = (roomNumber, date) => {
+    return allGuests.some(reservation => {
+      if (reservation.status === 'cancelled') return false
+      const arrival = new Date(reservation.date_of_arrival)
+      const departure = new Date(reservation.date_of_departure)
+      const checkDate = new Date(date)
+      
+      return reservation.room_numbers.includes(roomNumber) &&
+             checkDate >= arrival &&
+             checkDate <= departure
+    })
+  }
+
+  const getGuestForRoom = (roomNumber, date) => {
+    return allGuests.find(reservation => {
+      if (reservation.status === 'cancelled') return false
+      const arrival = new Date(reservation.date_of_arrival)
+      const departure = new Date(reservation.date_of_departure)
+      const checkDate = new Date(date)
+      
+      return reservation.room_numbers.includes(roomNumber) &&
+             checkDate >= arrival &&
+             checkDate <= departure
+    })
+  }
+
+  const renderReservationChart = () => {
+    const monthStart = startOfMonth(currentMonth)
+    const monthEnd = endOfMonth(currentMonth)
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
+    
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const sortedRooms = [...allRooms].sort((a, b) => {
+      const numA = parseInt(a.room_number.replace(/\D/g, ''))
+      const numB = parseInt(b.room_number.replace(/\D/g, ''))
+      return numA - numB
+    })
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-[10px]">
+          <thead>
+            <tr className="bg-dark-800">
+              <th className="border border-dark-700 p-1 text-left sticky left-0 bg-dark-800 z-10 min-w-[60px]">Room</th>
+              <th className="border border-dark-700 p-1 text-left sticky left-[60px] bg-dark-800 z-10 min-w-[50px]">Type</th>
+              {days.map((day, index) => {
+                const isPast = day < today
+                const isTodayDate = isToday(day)
+                return (
+                  <th key={index} className={`border border-dark-700 p-1 min-w-[30px] ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
+                    <div className={isPast ? 'text-gray-600' : 'text-gray-300'}>{format(day, 'dd')}</div>
+                    <div className={`text-[8px] ${isPast ? 'text-gray-700' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRooms.map((room) => (
+              <tr key={room.id} className="hover:bg-dark-800/50 h-8">
+                <td className="border border-dark-700 p-1 font-bold sticky left-0 bg-dark-900 z-10">
+                  {room.room_number}
+                </td>
+                <td className="border border-dark-700 p-1 sticky left-[60px] bg-dark-900 z-10 text-[9px] text-gray-400">
+                  {room.room_type}
+                </td>
+                {days.map((day, index) => {
+                  const dateStr = format(day, 'yyyy-MM-dd')
+                  const guest = getGuestForRoom(room.room_number, dateStr)
+                  const isOccupied = isRoomOccupied(room.room_number, dateStr)
+                  const isPast = day < today
+                  
+                  let bgColor = 'bg-green-500/20 hover:bg-green-500/30'
+                  if (guest) {
+                    if (guest.status === 'reserved') bgColor = 'bg-red-500/30 hover:bg-red-500/40'
+                    else if (guest.status === 'checked_in') bgColor = 'bg-blue-500/30 hover:bg-blue-500/40'
+                    else if (guest.status === 'checked_out') bgColor = 'bg-yellow-500/30 hover:bg-yellow-500/40'
+                  } else if (isPast) {
+                    bgColor = 'bg-gray-700/20'
+                  }
+                  
+                  return (
+                    <td
+                      key={index}
+                      onClick={() => guest && handleGuestClick(guest.id)}
+                      className={`border border-dark-700 p-0 text-center cursor-pointer transition-colors ${bgColor}`}
+                      title={
+                        guest 
+                          ? `${guest.name_with_initials} (${guest.grc_number}) - ${guest.status.replace('_', ' ')}` 
+                          : isPast ? 'Past date' : 'Available'
+                      }
+                    >
+                      {guest && (
+                        <div className={`text-[8px] font-bold leading-tight ${isPast ? 'text-gray-500' : 'text-white'}`}>
+                          {guest.room_type}{guest.meal_plan || ''}
+                        </div>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
+
   const statCards = [
     {
       title: 'Today\'s Guests',
@@ -819,22 +929,56 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 2xl:grid-cols-6 gap-6">
-        {statCards.map((stat, index) => (
-          <div
-            key={stat.title}
-            className="card p-6 hover:scale-105 transition-transform duration-200"
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={stat.iconColor} size={24} />
-              </div>
-            </div>
-            <h3 className="text-gray-400 text-sm font-medium">{stat.title}</h3>
-            <p className="text-xl font-bold text-white mt-2">{stat.value}</p>
+      {/* Reservation Chart Timeline */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-2">
+            <Calendar className="text-gray-400" size={20} />
+            <h2 className="text-lg font-semibold text-white">Reservation Chart</h2>
           </div>
-        ))}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              className="p-1 hover:bg-dark-700 rounded transition-colors"
+            >
+              <ChevronLeft size={18} className="text-gray-400" />
+            </button>
+            <span className="text-white font-medium text-sm min-w-[100px] text-center">
+              {format(currentMonth, 'MMMM yyyy')}
+            </span>
+            <button
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              className="p-1 hover:bg-dark-700 rounded transition-colors"
+            >
+              <ChevronRight size={18} className="text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 flex items-center flex-wrap gap-4 text-xs">
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-green-500/20 border border-green-500/50 rounded"></div>
+            <span className="text-gray-400">Available</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-red-500/30 border border-red-500/50 rounded"></div>
+            <span className="text-gray-400">Reserved</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-blue-500/30 border border-blue-500/50 rounded"></div>
+            <span className="text-gray-400">Check-in</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-yellow-500/30 border border-yellow-500/50 rounded"></div>
+            <span className="text-gray-400">Check-out</span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <div className="w-3 h-3 bg-gray-700/20 border border-gray-700/50 rounded"></div>
+            <span className="text-gray-400">Past</span>
+          </div>
+        </div>
+
+        {renderReservationChart()}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -927,6 +1071,24 @@ export default function Dashboard() {
             </LineChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 2xl:grid-cols-6 gap-6">
+        {statCards.map((stat, index) => (
+          <div
+            key={stat.title}
+            className="card p-6 hover:scale-105 transition-transform duration-200"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
+                <stat.icon className={stat.iconColor} size={24} />
+              </div>
+            </div>
+            <h3 className="text-gray-400 text-sm font-medium">{stat.title}</h3>
+            <p className="text-xl font-bold text-white mt-2">{stat.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Date Modal */}

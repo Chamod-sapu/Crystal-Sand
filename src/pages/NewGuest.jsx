@@ -17,7 +17,9 @@ export default function NewGuest() {
   const [uploadedFile, setUploadedFile] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
-  const [registrationType, setRegistrationType] = useState('reservation')
+  const [registrationType, setRegistrationType] = useState('checkin')
+  const [onlineBookingType, setOnlineBookingType] = useState('')
+  const [travellingAgentName, setTravellingAgentName] = useState('')
   const [countries, setCountries] = useState([
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
     'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -72,7 +74,6 @@ export default function NewGuest() {
     number_of_rooms: 1,
     number_of_adults: 2,
     number_of_children: 0,
-    children_ages: [],
     meal_plan: 'BB',
     date_of_arrival: format(new Date(), 'yyyy-MM-dd'),
     date_of_departure: format(new Date(Date.now() + 86400000), 'yyyy-MM-dd'),
@@ -155,8 +156,8 @@ export default function NewGuest() {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB')
+    if (file.size > 2.5 * 1024 * 1024) {
+      setError('File size must be less than 2.5MB')
       event.target.value = ''
       return
     }
@@ -495,28 +496,6 @@ export default function NewGuest() {
     })
   }
 
-  const addChildAge = () => {
-    setFormData(prev => ({
-      ...prev,
-      children_ages: [...prev.children_ages, 0]
-    }))
-  }
-
-  const updateChildAge = (index, age) => {
-    setFormData(prev => {
-      const newAges = [...prev.children_ages]
-      newAges[index] = parseInt(age) || 0
-      return { ...prev, children_ages: newAges }
-    })
-  }
-
-  const removeChildAge = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      children_ages: prev.children_ages.filter((_, i) => i !== index)
-    }))
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     
@@ -600,7 +579,7 @@ export default function NewGuest() {
         return total + roomCharge
       }, 0)
 
-      const guestStatus = registrationType === 'reservation' ? 'reserved' : 'checked_in'
+      const guestStatus = registrationType === 'reservation' ? 'reserved' : registrationType === 'online_booking' ? 'reserved' : 'checked_in'
 
       const arrivalDate = new Date(formData.date_of_arrival)
       const departureDate = new Date(formData.date_of_departure)
@@ -645,7 +624,7 @@ export default function NewGuest() {
         }
       }
 
-      const successMessage = registrationType === 'reservation' 
+      const successMessage = registrationType === 'reservation' || registrationType === 'online_booking'
         ? 'Reservation created successfully!' 
         : 'Guest checked in successfully!'
 
@@ -741,7 +720,7 @@ export default function NewGuest() {
 
       <div className="card p-6">
         <h2 className="text-xl font-bold text-white mb-4">Registration Type</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             type="button"
             onClick={() => setRegistrationType('reservation')}
@@ -791,7 +770,78 @@ export default function NewGuest() {
               Check-in guest immediately. Rooms will be marked as occupied and guest status will be "checked in".
             </p>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setRegistrationType('online_booking')}
+            className={`p-6 rounded-lg border-2 transition-all text-left ${
+              registrationType === 'online_booking'
+                ? 'border-primary-600 bg-primary-600/10'
+                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+            }`}
+            disabled={loading}
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                registrationType === 'online_booking' ? 'border-primary-600' : 'border-dark-600'
+              }`}>
+                {registrationType === 'online_booking' && (
+                  <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
+                )}
+              </div>
+              <span className="text-xl font-bold text-white">Online Booking</span>
+            </div>
+            <p className="text-sm text-gray-400 ml-8">
+              Booking made through online platforms like Agoda, Booking.com, or a Travelling Agent.
+            </p>
+          </button>
         </div>
+
+        {/* Online Booking Sub-options */}
+        {registrationType === 'online_booking' && (
+          <div className="mt-4 pt-4 border-t border-dark-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Online Booking Source *</label>
+                <select
+                  value={onlineBookingType}
+                  onChange={(e) => {
+                    setOnlineBookingType(e.target.value)
+                    setTravellingAgentName('')
+                  }}
+                  className="input-field"
+                  required={registrationType === 'online_booking'}
+                  disabled={loading}
+                >
+                  <option value="">Select Source</option>
+                  <option value="agoda">Agoda</option>
+                  <option value="booking_com">Booking.com</option>
+                  <option value="travelling_agent">Travelling Agent</option>
+                </select>
+              </div>
+              {onlineBookingType === 'travelling_agent' && (
+                <div>
+                  <label className="label">Travelling Agent Name *</label>
+                  <select
+                    value={travellingAgentName}
+                    onChange={(e) => setTravellingAgentName(e.target.value)}
+                    className="input-field"
+                    required={onlineBookingType === 'travelling_agent'}
+                    disabled={loading}
+                  >
+                    <option value="">Select Agent</option>
+                    <option value="Jetwing Travels">Jetwing Travels</option>
+                    <option value="Aitken Spence">Aitken Spence</option>
+                    <option value="Walkers Tours">Walkers Tours</option>
+                    <option value="John Keells Holdings">John Keells Holdings</option>
+                    <option value="Quickshaws Tours">Quickshaws Tours</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -912,7 +962,7 @@ export default function NewGuest() {
                         <p className="mb-2 text-sm text-gray-400">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
-                        <p className="text-xs text-gray-500">PDF only (MAX. 5MB)</p>
+                <p className="text-xs text-gray-500">PDF only (MAX. 2.5MB)</p>
                       </>
                     )}
                   </div>
@@ -1036,18 +1086,12 @@ export default function NewGuest() {
                         newChildren = type.maxChildren
                       }
                       
-                      let newChildrenAges = prev.children_ages
-                      if (newChildren < prev.children_ages.length) {
-                        newChildrenAges = prev.children_ages.slice(0, newChildren)
-                      }
-                      
                       return {
                         ...prev, 
                         room_type: type.code, 
                         room_numbers: [],
                         number_of_adults: newAdults,
-                        number_of_children: newChildren,
-                        children_ages: newChildrenAges
+                        number_of_children: newChildren
                       }
                     })
                   }}
@@ -1163,7 +1207,7 @@ export default function NewGuest() {
               )}
             </div>
             <div>
-              <label className="label">Number of Children</label>
+              <label className="label">Number of Children (1-12 years)</label>
               <input
                 type="number"
                 name="number_of_children"
@@ -1179,10 +1223,7 @@ export default function NewGuest() {
                   const adjustedValue = Math.min(Math.max(0, value), maxChildren)
                   setFormData(prev => ({ 
                     ...prev, 
-                    number_of_children: adjustedValue,
-                    children_ages: adjustedValue < prev.children_ages.length 
-                      ? prev.children_ages.slice(0, adjustedValue)
-                      : [...prev.children_ages]
+                    number_of_children: adjustedValue
                   }))
                   validateField('number_of_children', adjustedValue)
                 }}
@@ -1196,46 +1237,6 @@ export default function NewGuest() {
             </div>
           </div>
 
-          {formData.number_of_children > 0 && (
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-3">
-                <label className="label">Children Ages (0-17 years)</label>
-                <button
-                  type="button"
-                  onClick={addChildAge}
-                  className="btn-secondary text-sm py-1 px-3"
-                  disabled={formData.children_ages.length >= formData.number_of_children || loading}
-                >
-                  <Plus size={16} className="inline mr-1" />
-                  Add Age
-                </button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {formData.children_ages.map((age, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <input
-                      type="number"
-                      value={age}
-                      onChange={(e) => updateChildAge(index, e.target.value)}
-                      className="input-field"
-                      min="0"
-                      max="17"
-                      placeholder="Age"
-                      disabled={loading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeChildAge(index)}
-                      className="p-2 hover:bg-dark-800 rounded-lg text-red-400 disabled:opacity-50"
-                      disabled={loading}
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="card p-6">
@@ -1490,7 +1491,7 @@ export default function NewGuest() {
             ) : (
               <>
                 <Save size={20} />
-                <span>{registrationType === 'reservation' ? 'Create Reservation' : 'Check-in Guest'}</span>
+                <span>{registrationType === 'reservation' || registrationType === 'online_booking' ? 'Create Reservation' : 'Check-in Guest'}</span>
               </>
             )}
           </button>
