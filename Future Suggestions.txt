@@ -54,3 +54,17 @@ You did the great job. But I want these changes and upgrades further more.
 [Done] Show all the rooms in the room selection when a guest reservation. Selected rooms and non-selected rooms should be identified. @NewGuest.jsx
 
 
+------------------------------------09/03/2026---------------------------------------------
+[] Make the resevation chart color pallete as in the rooms color pallete [Available-Green, Reserved-Red, Check-in-Blue, Check-out-Yellow]
+[] Remove the numbers in the reservation chart. Instead of numbers, show the type like room type. As an example, RODB(RODB means Room Only + Bed & Breakfast)
+[] Take the reservation chart under the search bar in the dashboard. Keep other charts and option under the reservation chart.
+[] Keep the default status in guest page as "check-in"
+[] In new guest page, add a registration type as "Online Booking". Online booking types are Agoda, Booking.com, Travelling agents. After selecting the travelling agent, there should be a dropdown to select the travelling agent name.
+[]In New guest page, show the age range of children as 1 to 12 years. 
+[]In new guest page, limit the file upload size of passport or NIC for 2.5 MB
+[]In rooms page, there is an error when searching from using GRC number. Make that search bar to search from Guest GRC number, phone number, NIC/passport,room number.
+[]In rooms page, when click the room number, it should be open the guest details popup.
+[]In rooms page, there should be option to bill the room payment only. That means the bill should be included only the room related payments. Not other payment for additional things like resturant items.
+[]In Food and Beverages page, resturants items should be available to select in rooms also as in the resturant tables.
+[]In Food and Beverages page, remove the editing ability of the unit price in add new order after selecting a item.
+

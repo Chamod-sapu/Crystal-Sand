@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { formatCurrency } from '../utils/calculations'
-import { Plus, Edit2, Trash2, X, Save, AlertCircle } from 'lucide-react'
+import { formatCurrency, calculateBillTotal } from '../utils/calculations'
+import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer } from 'lucide-react'
+import { format } from 'date-fns'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+import logo from '../Images/Untitled design (2).png'
 
 /*
 Note: To solve the check constraint violation when saving a room with room_type '6PAX', 
@@ -32,11 +36,16 @@ export default function Rooms() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [searchGRC, setSearchGRC] = useState('')
   const [formError, setFormError] = useState('')
+  const [guests, setGuests] = useState([])
+  const [selectedGuestPopup, setSelectedGuestPopup] = useState(null)
+  const [purchases, setPurchases] = useState([])
+  const [loadingGuestPopup, setLoadingGuestPopup] = useState(false)
 
   useEffect(() => {
     initializeRoomTypes()
     loadRooms()
     loadRoomTypes()
+    loadGuests()
   }, [])
 
   async function initializeRoomTypes() {
@@ -73,6 +82,18 @@ export default function Rooms() {
     } catch (error) {
       console.error('Error loading rooms:', error)
       setLoading(false)
+    }
+  }
+
+  async function loadGuests() {
+    try {
+      const { data } = await supabase
+        .from('guests')
+        .select('*')
+        .not('status', 'eq', 'cancelled')
+      setGuests(data || [])
+    } catch (error) {
+      console.error('Error loading guests:', error)
     }
   }
 
@@ -243,10 +264,30 @@ export default function Rooms() {
     setFormError('')
   }
 
+  const getGuestForRoom = (roomNumber) => {
+    return guests.find(g => 
+      g.room_numbers?.includes(roomNumber) && 
+      ['checked_in', 'reserved'].includes(g.status)
+    ) || null
+  }
+
   const filteredRooms = rooms.filter(room => {
     const matchesStatus = filterStatus === 'all' || room.status === filterStatus
-    const matchesSearch = !searchGRC || room.room_number.toLowerCase().includes(searchGRC.toLowerCase())
-    return matchesStatus && matchesSearch
+    const search = searchGRC.toLowerCase().trim()
+    if (!search) return matchesStatus
+    
+    // Match room number directly
+    if (room.room_number.toLowerCase().includes(search)) return matchesStatus
+    
+    // Match guest fields (GRC, phone, NIC/passport)
+    const guest = getGuestForRoom(room.room_number)
+    if (guest) {
+      const grcMatch = guest.grc_number?.toLowerCase().includes(search)
+      const phoneMatch = guest.mobile_number?.toLowerCase().includes(search)
+      const nicMatch = guest.passport_nic?.toLowerCase().includes(search)
+      if (grcMatch || phoneMatch || nicMatch) return matchesStatus
+    }
+    return false
   })
 
   const roomTypeMap = Object.fromEntries(roomTypes.map(rt => [rt.code, rt.name]))
@@ -259,6 +300,104 @@ export default function Rooms() {
       [type.code]: { count, occupied, available: count - occupied }
     }
   }, {})
+
+  async function handleRoomCardClick(room) {
+    const guest = getGuestForRoom(room.room_number)
+    if (!guest) return
+    setLoadingGuestPopup(true)
+    setSelectedGuestPopup(guest)
+    try {
+      const { data } = await supabase
+        .from('purchases')
+        .select('*')
+        .eq('guest_id', guest.id)
+        .order('purchase_date', { ascending: false })
+      setPurchases(data || [])
+    } catch (e) {
+      setPurchases([])
+    } finally {
+      setLoadingGuestPopup(false)
+    }
+  }
+
+  const generateRoomBillPDF = () => {
+    if (!selectedGuestPopup) return
+
+    const doc = new jsPDF()
+    const cyanColor = [8, 145, 178]
+
+    // Background color for header
+    doc.setFillColor(31, 41, 55)
+    doc.rect(0, 0, 210, 40, 'F')
+
+    // Logo
+    try {
+      doc.addImage(logo, 'PNG', 10, 5, 30, 30)
+    } catch (e) {
+      console.error('Logo not found')
+    }
+
+    // Title
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(24)
+    doc.setFont('helvetica', 'bold')
+    doc.text('CRYSTAL SANDS', 150, 20, { align: 'right' })
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text('Room-Only Bill', 150, 28, { align: 'right' })
+
+    // Bill Info
+    doc.setTextColor(31, 41, 55)
+    doc.setFontSize(10)
+    doc.text(`GRC: ${selectedGuestPopup.grc_number}`, 10, 50)
+    doc.text(`Date: ${format(new Date(), 'dd MMM yyyy, HH:mm')}`, 150, 50)
+
+    // Guest Info Table
+    doc.autoTable({
+      startY: 60,
+      head: [['Guest Information', '']],
+      body: [
+        ['Guest Name', selectedGuestPopup.name_with_initials],
+        ['Passport / NIC', selectedGuestPopup.passport_nic],
+        ['Room Number', selectedGuestPopup.room_numbers?.join(', ')],
+        ['Room Type', selectedGuestPopup.room_type],
+        ['Check-in', `${format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} ${selectedGuestPopup.time_of_arrival}`],
+        ['Check-out', `${format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} ${selectedGuestPopup.time_of_departure}`],
+        ['Number of Nights', selectedGuestPopup.number_of_nights]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: cyanColor, textColor: 255 },
+      styles: { fontSize: 9 }
+    })
+
+    // Bill Details Table
+    const roomCharge = selectedGuestPopup.total_room_charge || 0
+    const advancePaid = selectedGuestPopup.advance_payment_amount || 0
+    const totalDue = Math.max(0, roomCharge - advancePaid)
+
+    doc.autoTable({
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [['Description', 'Amount (LKR)']],
+      body: [
+        ['Total Room Charge', formatCurrency(roomCharge)],
+        ['Advance Payment', `-${formatCurrency(advancePaid)}`],
+        [{ content: 'Total Balance Due', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, 
+         { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: cyanColor, textColor: 255 },
+      styles: { fontSize: 10 }
+    })
+
+    // Footer
+    const finalY = doc.lastAutoTable.finalY + 20
+    doc.setFontSize(9)
+    doc.text('Thank you for choosing Crystal Sands!', 105, finalY, { align: 'center' })
+    doc.text('This is a room-only bill and does not include additional purchases.', 105, finalY + 5, { align: 'center' })
+
+    doc.save(`RoomBill_${selectedGuestPopup.grc_number}.pdf`)
+  }
 
   if (loading) {
     return (
@@ -412,13 +551,14 @@ export default function Rooms() {
       {/* Search and Filter Section */}
       <div className="card p-6">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex-1 w-full md:max-w-md">
+          <div className="flex-1 w-full md:max-w-md relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
             <input
               type="text"
-              placeholder="Enter GRC Number"
+              placeholder="Search by Room No., GRC, Phone or NIC/Passport"
               value={searchGRC}
               onChange={(e) => setSearchGRC(e.target.value)}
-              className="input-field w-full"
+              className="input-field w-full pl-10"
             />
           </div>
           <div className="flex items-center gap-4">
@@ -473,83 +613,228 @@ export default function Rooms() {
             No rooms found
           </div>
         ) : (
-          filteredRooms.map(room => (
-            <div
-              key={room.id}
-              className={`card p-5 border-2 transition-all hover:shadow-lg ${
-                room.status === 'available'
-                  ? 'border-green-500'
-                  : room.status === 'occupied'
-                  ? 'border-red-500'
-                  : 'border-yellow-500'
-              }`}
-            >
-              <div className="space-y-3">
-                {/* Room Number */}
-                <div className="text-center border-b border-dark-700 pb-3">
-                  <h3 className="text-2xl font-bold text-white">Room {room.room_number}</h3>
-                </div>
-
-                {/* Room Details */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Type</span>
-                    <span className="text-white font-medium">
-                      {roomTypeMap[room.room_type] || room.room_type}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Floor</span>
-                    <span className="text-white font-medium">Floor {room.floor || 1}</span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Base Price</span>
-                    <span className="text-primary-400 font-bold">
-                      {formatCurrency(room.base_price)}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-400">Status</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      room.status === 'available'
-                        ? 'bg-green-500/20 text-green-400'
-                        : room.status === 'occupied'
-                        ? 'bg-red-500/20 text-red-400'
-                        : 'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="pt-3 border-t border-dark-700">
-                  <div className="text-gray-400 text-xs mb-2">Actions</div>
-                  <div className="flex items-center justify-center space-x-2">
+          filteredRooms.map(room => {
+            const roomGuest = getGuestForRoom(room.room_number)
+            return (
+              <div
+                key={room.id}
+                className={`card p-5 border-2 transition-all hover:shadow-lg ${
+                  room.status === 'available'
+                    ? 'border-green-500'
+                    : room.status === 'occupied'
+                    ? 'border-red-500'
+                    : 'border-yellow-500'
+                }`}
+              >
+                <div className="space-y-3">
+                  {/* Room Number - clickable if has guest */}
+                  <div className="text-center border-b border-dark-700 pb-3">
                     <button
-                      onClick={() => handleEdit(room)}
-                      className="flex-1 flex items-center justify-center space-x-1 p-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors text-sm"
+                      onClick={() => roomGuest && handleRoomCardClick(room)}
+                      className={`text-2xl font-bold ${
+                        roomGuest ? 'text-primary-400 hover:underline cursor-pointer' : 'text-white cursor-default'
+                      }`}
+                      title={roomGuest ? 'Click to view guest details' : ''}
                     >
-                      <Edit2 size={16} />
-                      <span>Edit</span>
+                      Room {room.room_number}
                     </button>
-                    <button
-                      onClick={() => handleDelete(room.id)}
-                      className="flex-1 flex items-center justify-center space-x-1 p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm"
-                    >
-                      <Trash2 size={16} />
-                      <span>Delete</span>
-                    </button>
+                    {roomGuest && (
+                      <div className="text-xs text-gray-400 mt-1 truncate">{roomGuest.name_with_initials}</div>
+                    )}
+                  </div>
+
+                  {/* Room Details */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Type</span>
+                      <span className="text-white font-medium">
+                        {roomTypeMap[room.room_type] || room.room_type}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Floor</span>
+                      <span className="text-white font-medium">Floor {room.floor || 1}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Base Price</span>
+                      <span className="text-primary-400 font-bold">
+                        {formatCurrency(room.base_price)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Status</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        room.status === 'available'
+                          ? 'bg-green-500/20 text-green-400'
+                          : room.status === 'occupied'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-3 border-t border-dark-700">
+                    <div className="text-gray-400 text-xs mb-2">Actions</div>
+                    <div className="flex items-center justify-center space-x-2">
+                      <button
+                        onClick={() => handleEdit(room)}
+                        className="flex-1 flex items-center justify-center space-x-1 p-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors text-sm"
+                      >
+                        <Edit2 size={16} />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(room.id)}
+                        className="flex-1 flex items-center justify-center space-x-1 p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm"
+                      >
+                        <Trash2 size={16} />
+                        <span>Delete</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
+
+      {/* Guest Details Popup */}
+      {selectedGuestPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-dark-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <User className="text-primary-400" size={24} />
+                  <div>
+                    <h2 className="text-xl font-bold text-white">{selectedGuestPopup.name_with_initials}</h2>
+                    <p className="text-primary-400 text-sm">{selectedGuestPopup.grc_number}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setSelectedGuestPopup(null); setPurchases([]) }}
+                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                >
+                  <X size={20} className="text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] space-y-4">
+              {loadingGuestPopup ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-start space-x-3">
+                      <CreditCard className="text-primary-400 mt-1" size={18} />
+                      <div>
+                        <p className="text-gray-400 text-xs">NIC / Passport</p>
+                        <p className="text-white font-medium">{selectedGuestPopup.passport_nic}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Phone className="text-primary-400 mt-1" size={18} />
+                      <div>
+                        <p className="text-gray-400 text-xs">Mobile</p>
+                        <p className="text-white font-medium">{selectedGuestPopup.mobile_number}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Calendar className="text-primary-400 mt-1" size={18} />
+                      <div>
+                        <p className="text-gray-400 text-xs">Check-in</p>
+                        <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} {selectedGuestPopup.time_of_arrival}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <Calendar className="text-primary-400 mt-1" size={18} />
+                      <div>
+                        <p className="text-gray-400 text-xs">Check-out</p>
+                        <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} {selectedGuestPopup.time_of_departure}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-dark-800 rounded-lg p-4">
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-xs text-gray-500">Room(s)</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.room_numbers?.join(', ')}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Room Type</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.room_type}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Meal Plan</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.meal_plan || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Adults</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.number_of_adults}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Children</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.number_of_children}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Nights</p>
+                        <p className="text-white font-bold">{selectedGuestPopup.number_of_nights}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Room-Only Bill Summary */}
+                  <div className="bg-primary-600/10 border border-primary-600/20 rounded-lg p-4">
+                    <h3 className="text-white font-semibold mb-3">Room-Only Bill</h3>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Room Charge</span>
+                        <span className="text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
+                      </div>
+                      {selectedGuestPopup.advance_payment_amount > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Advance Paid</span>
+                          <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-primary-600/20">
+                        <span className="text-white font-bold">Balance (Room Only)</span>
+                        <span className="text-primary-400 font-bold text-lg">
+                          {formatCurrency(Math.max(0, (selectedGuestPopup.total_room_charge || 0) - (selectedGuestPopup.advance_payment_amount || 0)))}
+                        </span>
+                      </div>
+                    </div>
+                    {purchases.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        * Excludes {purchases.length} additional purchase(s) totalling {formatCurrency(purchases.reduce((s, p) => s + p.total_price, 0))}
+                      </p>
+                    )}
+
+                    <button
+                      onClick={generateRoomBillPDF}
+                      className="w-full btn-primary flex items-center justify-center space-x-2 mt-4"
+                    >
+                      <Printer size={18} />
+                      <span>Print Room Bill</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

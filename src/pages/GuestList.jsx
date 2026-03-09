@@ -10,7 +10,7 @@ export default function GuestList() {
   const [filteredGuests, setFilteredGuests] = useState([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('checked_in')
   const [dateFilter, setDateFilter] = useState('')
   const [checkingIn, setCheckingIn] = useState({})
 

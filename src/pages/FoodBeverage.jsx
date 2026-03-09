@@ -366,7 +366,7 @@ export default function FoodBeverage() {
   async function handleAddItem(e) {
     e.preventDefault()
 
-    if (!newItem.item_name || !newItem.category_name || newItem.quantity < 1) {
+    if (!newItem.item_name || newItem.quantity < 1) {
       showNotification('Please fill all required fields', 'error')
       return
     }
@@ -382,7 +382,7 @@ export default function FoodBeverage() {
           guest_id: guest?.id || null,
           item_id: newItem.item_id || null,
           item_name: newItem.item_name,
-          category: newItem.category_name,
+          category: newItem.category || 'food',
           quantity: newItem.quantity,
           unit_price: newItem.unit_price,
           total_price: totalPrice
@@ -1094,32 +1094,25 @@ export default function FoodBeverage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Category *</label>
-                      <select
-                        value={newItem.category_id}
-                        onChange={(e) => handleCategoryChange(e.target.value)}
-                        className="input-field"
-                        required
-                      >
-                        <option value="">Select Category</option>
-                        {categories.map(cat => (
-                          <option key={cat.id} value={cat.id}>{cat.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="label">Item *</label>
+                    <div className="col-span-2">
+                      <label className="label">Restaurant Item *</label>
                       <select
                         value={newItem.item_id}
-                        onChange={(e) => handleItemChange(e.target.value)}
+                        onChange={(e) => {
+                          const item = restaurantItems.find(i => i.id === e.target.value)
+                          setNewItem({
+                            ...newItem,
+                            item_id: e.target.value,
+                            item_name: item?.item_name || '',
+                            category: item?.category || '',
+                            unit_price: item?.unit_price || 0
+                          })
+                        }}
                         className="input-field"
                         required
-                        disabled={!newItem.category_id}
                       >
                         <option value="">Select Item</option>
-                        {filteredMenuItems.map(item => (
+                        {Array.from(new Map(restaurantItems.filter(i => i.is_available).map(item => [item.item_name, item])).values()).map(item => (
                           <option key={item.id} value={item.id}>
                             {item.item_name} - {formatCurrency(item.unit_price)}
                           </option>
@@ -1140,15 +1133,13 @@ export default function FoodBeverage() {
                     </div>
 
                     <div>
-                      <label className="label">Unit Price (LKR) *</label>
+                      <label className="label">Unit Price (LKR)</label>
                       <input
                         type="number"
                         value={newItem.unit_price}
-                        onChange={(e) => setNewItem({ ...newItem, unit_price: parseFloat(e.target.value) || 0 })}
-                        className="input-field"
-                        min="0"
-                        step="0.01"
-                        required
+                        className="input-field bg-dark-900 cursor-not-allowed"
+                        readOnly
+                        tabIndex={-1}
                       />
                     </div>
                   </div>
@@ -1364,7 +1355,7 @@ export default function FoodBeverage() {
                         required
                       >
                         <option value="">Select Item</option>
-                        {restaurantItems.filter(i => i.is_available).map(item => (
+                        {Array.from(new Map(restaurantItems.filter(i => i.is_available).map(item => [item.item_name, item])).values()).map(item => (
                           <option key={item.id} value={item.id}>
                             {item.item_name} - {formatCurrency(item.unit_price)}
                           </option>
@@ -1385,15 +1376,13 @@ export default function FoodBeverage() {
                     </div>
 
                     <div>
-                      <label className="label">Unit Price (LKR) *</label>
+                      <label className="label">Unit Price (LKR)</label>
                       <input
                         type="number"
                         value={newRestaurantOrder.unit_price}
-                        onChange={(e) => setNewRestaurantOrder({ ...newRestaurantOrder, unit_price: parseFloat(e.target.value) || 0 })}
-                        className="input-field"
-                        min="0"
-                        step="0.01"
-                        required
+                        className="input-field bg-dark-900 cursor-not-allowed"
+                        readOnly
+                        tabIndex={-1}
                       />
                     </div>
 
