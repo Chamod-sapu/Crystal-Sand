@@ -511,18 +511,19 @@ export default function ReservationForecast() {
     })
 
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-xs">
+      <div className="w-full">
+        <table className="w-full border-collapse text-[10px] sm:text-xs table-fixed">
           <thead>
             <tr className="bg-dark-800">
-              <th className="border border-dark-700 p-2 text-left sticky left-0 bg-dark-800 z-10">Room</th>
-              <th className="border border-dark-700 p-2 text-left sticky left-16 bg-dark-800 z-10">Type</th>
+              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16">Room</th>
+              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
               {days.map((day, index) => {
                 const isPast = day < today
+                const isTodayDate = isToday && isToday(day)
                 return (
-                  <th key={index} className={`border border-dark-700 p-2 min-w-[40px] ${isPast ? 'bg-gray-700/30' : ''}`}>
-                    <div className={isPast ? 'text-gray-600' : ''}>{format(day, 'dd')}</div>
-                    <div className={`text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
+                  <th key={index} className={`border border-dark-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
+                    <div className={`${isPast ? 'text-gray-600' : 'text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
+                    <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
                   </th>
                 )
               })}
@@ -531,10 +532,10 @@ export default function ReservationForecast() {
           <tbody>
             {sortedRooms.map((room) => (
               <tr key={room.id} className="hover:bg-dark-800/50">
-                <td className="border border-dark-700 p-2 font-bold sticky left-0 bg-dark-900 z-10">
+                <td className="border border-dark-700 p-1 font-bold truncate">
                   {room.room_number}
                 </td>
-                <td className="border border-dark-700 p-2 sticky left-16 bg-dark-900 z-10">
+                <td className="border border-dark-700 p-1 truncate hidden md:table-cell text-[10px] text-gray-400">
                   {room.room_type}
                 </td>
                 {days.map((day, index) => {
@@ -546,7 +547,7 @@ export default function ReservationForecast() {
                   return (
                     <td
                       key={index}
-                      className={`border border-dark-700 p-1 text-center ${
+                      className={`border border-dark-700 p-0 text-center relative ${
                         isPast && !isOccupied
                           ? 'bg-gray-700/20 cursor-not-allowed'
                           : guest?.status === 'reserved'
@@ -566,7 +567,7 @@ export default function ReservationForecast() {
                       }
                     >
                       {guest && (
-                        <div className={`text-[10px] font-bold ${isPast ? 'text-gray-500' : 'text-white'}`}>
+                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-white'} hidden lg:block truncate`}>
                           {guest.room_type}{guest.meal_plan || ''}
                         </div>
                       )}

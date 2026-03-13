@@ -448,19 +448,19 @@ export default function Dashboard() {
     })
 
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[10px]">
+      <div className="w-full">
+        <table className="w-full border-collapse text-[10px] sm:text-xs table-fixed">
           <thead>
             <tr className="bg-dark-800">
-              <th className="border border-dark-700 p-1 text-left sticky left-0 bg-dark-800 z-10 min-w-[60px]">Room</th>
-              <th className="border border-dark-700 p-1 text-left sticky left-[60px] bg-dark-800 z-10 min-w-[50px]">Type</th>
+              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16">Room</th>
+              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
               {days.map((day, index) => {
                 const isPast = day < today
                 const isTodayDate = isToday(day)
                 return (
-                  <th key={index} className={`border border-dark-700 p-1 min-w-[30px] ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
-                    <div className={isPast ? 'text-gray-600' : 'text-gray-300'}>{format(day, 'dd')}</div>
-                    <div className={`text-[8px] ${isPast ? 'text-gray-700' : 'text-gray-500'}`}>{format(day, 'EEE')}</div>
+                  <th key={index} className={`border border-dark-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
+                    <div className={`${isPast ? 'text-gray-600' : 'text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
+                    <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
                   </th>
                 )
               })}
@@ -468,11 +468,11 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {sortedRooms.map((room) => (
-              <tr key={room.id} className="hover:bg-dark-800/50 h-8">
-                <td className="border border-dark-700 p-1 font-bold sticky left-0 bg-dark-900 z-10">
+              <tr key={room.id} className="hover:bg-dark-800/50">
+                <td className="border border-dark-700 p-1 font-bold truncate">
                   {room.room_number}
                 </td>
-                <td className="border border-dark-700 p-1 sticky left-[60px] bg-dark-900 z-10 text-[9px] text-gray-400">
+                <td className="border border-dark-700 p-1 truncate hidden md:table-cell text-[10px] text-gray-400">
                   {room.room_type}
                 </td>
                 {days.map((day, index) => {
@@ -481,28 +481,31 @@ export default function Dashboard() {
                   const isOccupied = isRoomOccupied(room.room_number, dateStr)
                   const isPast = day < today
                   
-                  let bgColor = 'bg-green-500/20 hover:bg-green-500/30'
-                  if (guest) {
-                    if (guest.status === 'reserved') bgColor = 'bg-yellow-500/30 hover:bg-yellow-500/40'
-                    else if (guest.status === 'checked_in') bgColor = 'bg-red-500/30 hover:bg-red-500/40'
-                    else if (guest.status === 'checked_out') bgColor = 'bg-blue-500/30 hover:bg-blue-500/40'
-                  } else if (isPast) {
-                    bgColor = 'bg-gray-700/20'
-                  }
-                  
                   return (
                     <td
                       key={index}
                       onClick={() => guest && handleGuestClick(guest.id)}
-                      className={`border border-dark-700 p-0 text-center cursor-pointer transition-colors ${bgColor}`}
+                      className={`border border-dark-700 p-0 text-center relative ${
+                        isPast && !isOccupied
+                          ? 'bg-gray-700/20 cursor-not-allowed'
+                          : guest?.status === 'reserved'
+                          ? 'bg-yellow-500/60 hover:bg-yellow-500/80 cursor-pointer'
+                          : guest?.status === 'checked_in'
+                          ? 'bg-red-500/60 hover:bg-red-500/80 cursor-pointer'
+                          : guest?.status === 'checked_out'
+                          ? 'bg-blue-500/60 hover:bg-blue-500/80 cursor-pointer'
+                          : 'bg-green-500/40 hover:bg-green-500/60 cursor-pointer'
+                      }`}
                       title={
-                        guest 
+                        isPast && !isOccupied 
+                          ? 'Past date' 
+                          : guest 
                           ? `${guest.name_with_initials} (${guest.grc_number}) - ${guest.status.replace('_', ' ')}` 
-                          : isPast ? 'Past date' : 'Available'
+                          : 'Available'
                       }
                     >
                       {guest && (
-                        <div className={`text-[8px] font-bold leading-tight ${isPast ? 'text-gray-500' : 'text-white'}`}>
+                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-white'} hidden lg:block truncate`}>
                           {guest.room_type}{guest.meal_plan || ''}
                         </div>
                       )}
