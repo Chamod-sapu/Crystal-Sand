@@ -41,6 +41,10 @@ export default function FoodBeverage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [notification, setNotification] = useState(null)
   const [editingRestaurantItem, setEditingRestaurantItem] = useState(null)
+  const [roomItemSearch, setRoomItemSearch] = useState('')
+  const [restaurantItemSearch, setRestaurantItemSearch] = useState('')
+  const [showRoomItemDropdown, setShowRoomItemDropdown] = useState(false)
+  const [showRestaurantItemDropdown, setShowRestaurantItemDropdown] = useState(false)
 
   const [newItem, setNewItem] = useState({
     category_id: '',
@@ -1035,14 +1039,14 @@ export default function FoodBeverage() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Calendar className="text-primary-400" size={18} />
+                    <Calendar className="text-white" size={18} />
                     <div>
                       <div className="text-xs text-gray-500">GRC Number</div>
                       <div className="text-primary-400 font-medium">{currentGuest.grc_number}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Calendar className="text-primary-400" size={18} />
+                    <Calendar className="text-white" size={18} />
                     <div>
                       <div className="text-xs text-gray-500">Check-in</div>
                       <div className="text-white font-medium">
@@ -1094,30 +1098,52 @@ export default function FoodBeverage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                    <div className="col-span-2 relative">
                       <label className="label">Restaurant Item *</label>
-                      <select
-                        value={newItem.item_id}
-                        onChange={(e) => {
-                          const item = restaurantItems.find(i => i.id === e.target.value)
-                          setNewItem({
-                            ...newItem,
-                            item_id: e.target.value,
-                            item_name: item?.item_name || '',
-                            category: item?.category || '',
-                            unit_price: item?.unit_price || 0
-                          })
-                        }}
-                        className="input-field"
-                        required
-                      >
-                        <option value="">Select Item</option>
-                        {Array.from(new Map(restaurantItems.filter(i => i.is_available).map(item => [item.item_name, item])).values()).map(item => (
-                          <option key={item.id} value={item.id}>
-                            {item.item_name} - {formatCurrency(item.unit_price)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={roomItemSearch || newItem.item_name}
+                          onChange={(e) => {
+                            setRoomItemSearch(e.target.value)
+                            setShowRoomItemDropdown(true)
+                          }}
+                          onFocus={() => setShowRoomItemDropdown(true)}
+                          className="input-field w-full"
+                          placeholder="Type to search items..."
+                        />
+                        {showRoomItemDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                            {Array.from(new Map(restaurantItems
+                              .filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase()))
+                              .map(item => [item.item_name, item])).values())
+                              .map(item => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-dark-700 last:border-0"
+                                  onClick={() => {
+                                    setNewItem({
+                                      ...newItem,
+                                      item_id: item.id,
+                                      item_name: item.item_name,
+                                      category: item.category,
+                                      unit_price: item.unit_price
+                                    })
+                                    setRoomItemSearch(item.item_name)
+                                    setShowRoomItemDropdown(false)
+                                  }}
+                                >
+                                  <div className="font-medium text-sm">{item.item_name}</div>
+                                  <div className="text-xs text-gray-400">{formatCurrency(item.unit_price)}</div>
+                                </button>
+                              ))}
+                            {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase())).length === 0 && (
+                              <div className="px-4 py-3 text-sm text-gray-500 text-center italic">No items found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div>
@@ -1346,21 +1372,51 @@ export default function FoodBeverage() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                    <div className="col-span-2 relative">
                       <label className="label">Item *</label>
-                      <select
-                        value={newRestaurantOrder.item_id}
-                        onChange={(e) => handleRestaurantItemChange(e.target.value)}
-                        className="input-field"
-                        required
-                      >
-                        <option value="">Select Item</option>
-                        {Array.from(new Map(restaurantItems.filter(i => i.is_available).map(item => [item.item_name, item])).values()).map(item => (
-                          <option key={item.id} value={item.id}>
-                            {item.item_name} - {formatCurrency(item.unit_price)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={restaurantItemSearch || newRestaurantOrder.item_name}
+                          onChange={(e) => {
+                            setRestaurantItemSearch(e.target.value)
+                            setShowRestaurantItemDropdown(true)
+                          }}
+                          onFocus={() => setShowRestaurantItemDropdown(true)}
+                          className="input-field w-full"
+                          placeholder="Type to search items..."
+                        />
+                        {showRestaurantItemDropdown && (
+                          <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                            {Array.from(new Map(restaurantItems
+                              .filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase()))
+                              .map(item => [item.item_name, item])).values())
+                              .map(item => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-dark-700 last:border-0"
+                                  onClick={() => {
+                                    setNewRestaurantOrder({
+                                      ...newRestaurantOrder,
+                                      item_id: item.id,
+                                      item_name: item.item_name,
+                                      unit_price: item.unit_price
+                                    })
+                                    setRestaurantItemSearch(item.item_name)
+                                    setShowRestaurantItemDropdown(false)
+                                  }}
+                                >
+                                  <div className="font-medium text-sm">{item.item_name}</div>
+                                  <div className="text-xs text-gray-400">{formatCurrency(item.unit_price)}</div>
+                                </button>
+                              ))}
+                            {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase())).length === 0 && (
+                              <div className="px-4 py-3 text-sm text-gray-500 text-center italic">No items found</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div>

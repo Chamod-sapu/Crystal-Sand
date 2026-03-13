@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, calculateBillTotal } from '../utils/calculations'
-import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt } from 'lucide-react'
 import { format } from 'date-fns'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
@@ -320,8 +320,8 @@ export default function Rooms() {
     }
   }
 
-  const generateRoomBillPDF = () => {
-    if (!selectedGuestPopup) return
+  const generateRoomBillPDF = (guestToPrint = selectedGuestPopup) => {
+    if (!guestToPrint) return
 
     const doc = new jsPDF()
     const cyanColor = [8, 145, 178]
@@ -350,7 +350,7 @@ export default function Rooms() {
     // Bill Info
     doc.setTextColor(31, 41, 55)
     doc.setFontSize(10)
-    doc.text(`GRC: ${selectedGuestPopup.grc_number}`, 10, 50)
+    doc.text(`GRC: ${guestToPrint.grc_number}`, 10, 50)
     doc.text(`Date: ${format(new Date(), 'dd MMM yyyy, HH:mm')}`, 150, 50)
 
     // Guest Info Table
@@ -358,13 +358,13 @@ export default function Rooms() {
       startY: 60,
       head: [['Guest Information', '']],
       body: [
-        ['Guest Name', selectedGuestPopup.name_with_initials],
-        ['Passport / NIC', selectedGuestPopup.passport_nic],
-        ['Room Number', selectedGuestPopup.room_numbers?.join(', ')],
-        ['Room Type', selectedGuestPopup.room_type],
-        ['Check-in', `${format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} ${selectedGuestPopup.time_of_arrival}`],
-        ['Check-out', `${format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} ${selectedGuestPopup.time_of_departure}`],
-        ['Number of Nights', selectedGuestPopup.number_of_nights]
+        ['Guest Name', guestToPrint.name_with_initials],
+        ['Passport / NIC', guestToPrint.passport_nic],
+        ['Room Number', guestToPrint.room_numbers?.join(', ')],
+        ['Room Type', guestToPrint.room_type],
+        ['Check-in', `${format(new Date(guestToPrint.date_of_arrival), 'dd MMM yyyy')} ${guestToPrint.time_of_arrival}`],
+        ['Check-out', `${format(new Date(guestToPrint.date_of_departure), 'dd MMM yyyy')} ${guestToPrint.time_of_departure}`],
+        ['Number of Nights', guestToPrint.number_of_nights]
       ],
       theme: 'grid',
       headStyles: { fillColor: cyanColor, textColor: 255 },
@@ -372,8 +372,8 @@ export default function Rooms() {
     })
 
     // Bill Details Table
-    const roomCharge = selectedGuestPopup.total_room_charge || 0
-    const advancePaid = selectedGuestPopup.advance_payment_amount || 0
+    const roomCharge = guestToPrint.total_room_charge || 0
+    const advancePaid = guestToPrint.advance_payment_amount || 0
     const totalDue = Math.max(0, roomCharge - advancePaid)
 
     doc.autoTable({
@@ -396,7 +396,7 @@ export default function Rooms() {
     doc.text('Thank you for choosing Crystal Sands!', 105, finalY, { align: 'center' })
     doc.text('This is a room-only bill and does not include additional purchases.', 105, finalY + 5, { align: 'center' })
 
-    doc.save(`RoomBill_${selectedGuestPopup.grc_number}.pdf`)
+    doc.save(`RoomBill_${guestToPrint.grc_number}.pdf`)
   }
 
   if (loading) {
@@ -618,7 +618,7 @@ export default function Rooms() {
             return (
               <div
                 key={room.id}
-                className={`card p-5 border-2 transition-all hover:shadow-lg ${
+                className={`card p-5 border-2 transition-all hover:shadow-lg relative ${
                   room.status === 'available'
                     ? 'border-green-500'
                     : room.status === 'occupied'
@@ -626,6 +626,18 @@ export default function Rooms() {
                     : 'border-yellow-500'
                 }`}
               >
+                {roomGuest && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      generateRoomBillPDF(roomGuest)
+                    }}
+                    className="absolute top-3 right-3 p-2 bg-primary-600/20 hover:bg-primary-600 text-primary-400 hover:text-white rounded-full transition-all"
+                    title="Generate Room Bill"
+                  >
+                    <Receipt size={18} />
+                  </button>
+                )}
                 <div className="space-y-3">
                   {/* Room Number - clickable if has guest */}
                   <div className="text-center border-b border-dark-700 pb-3">
@@ -750,14 +762,14 @@ export default function Rooms() {
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <Calendar className="text-primary-400 mt-1" size={18} />
+                      <Calendar className="text-white mt-1" size={18} />
                       <div>
                         <p className="text-gray-400 text-xs">Check-in</p>
                         <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} {selectedGuestPopup.time_of_arrival}</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <Calendar className="text-primary-400 mt-1" size={18} />
+                      <Calendar className="text-white mt-1" size={18} />
                       <div>
                         <p className="text-gray-400 text-xs">Check-out</p>
                         <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} {selectedGuestPopup.time_of_departure}</p>

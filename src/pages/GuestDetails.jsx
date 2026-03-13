@@ -567,7 +567,7 @@ export default function GuestDetails() {
                 onClick={() => setShowExtendStay(true)}
                 className="btn-secondary flex items-center space-x-2"
               >
-                <CalendarPlus size={18} />
+                <CalendarPlus className="text-white" size={18} />
                 <span>Extend Stay</span>
               </button>
               <button
@@ -588,7 +588,7 @@ export default function GuestDetails() {
             <div className="p-6 border-b border-dark-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <CalendarPlus className="text-primary-400" size={24} />
+                  <CalendarPlus className="text-white" size={24} />
                   <h2 className="text-xl font-bold text-white">Extend Stay</h2>
                 </div>
                 <button
@@ -659,7 +659,7 @@ export default function GuestDetails() {
               {extendPreview && (
                 <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
                   <h3 className="text-green-400 font-semibold flex items-center space-x-2">
-                    <CalendarPlus size={18} />
+                    <CalendarPlus className="text-white" size={18} />
                     <span>Extension Preview</span>
                   </h3>
                   
@@ -732,7 +732,7 @@ export default function GuestDetails() {
                     </>
                   ) : (
                     <>
-                      <CalendarPlus size={18} />
+                      <CalendarPlus className="text-white" size={18} />
                       <span>Confirm Extension</span>
                     </>
                   )}
@@ -850,7 +850,7 @@ export default function GuestDetails() {
             <div className="mt-6 pt-6 border-t border-dark-800">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start space-x-3">
-                  <Calendar className="text-primary-400 mt-1" size={20} />
+                  <Calendar className="text-white mt-1" size={20} />
                   <div>
                     <p className="text-gray-400 text-sm">Check-in</p>
                     <p className="text-white font-medium">
@@ -859,7 +859,7 @@ export default function GuestDetails() {
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <Calendar className="text-primary-400 mt-1" size={20} />
+                  <Calendar className="text-white mt-1" size={20} />
                   <div>
                     <p className="text-gray-400 text-sm">Check-out</p>
                     <p className="text-white font-medium">
