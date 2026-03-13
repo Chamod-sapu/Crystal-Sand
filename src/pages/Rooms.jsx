@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, calculateBillTotal } from '../utils/calculations'
-import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt } from 'lucide-react'
-import { format } from 'date-fns'
+import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag } from 'lucide-react'
+import { format, addDays, differenceInDays } from 'date-fns'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import logo from '../Images/Untitled design (2).png'
@@ -40,6 +40,12 @@ export default function Rooms() {
   const [selectedGuestPopup, setSelectedGuestPopup] = useState(null)
   const [purchases, setPurchases] = useState([])
   const [loadingGuestPopup, setLoadingGuestPopup] = useState(false)
+  const [showExtendStay, setShowExtendStay] = useState(false)
+  const [extendDate, setExtendDate] = useState('')
+  const [extendPreview, setExtendPreview] = useState(null)
+  const [extendLoading, setExtendLoading] = useState(false)
+  const [extendError, setExtendError] = useState('')
+  const [checkingIn, setCheckingIn] = useState(false)
 
   useEffect(() => {
     initializeRoomTypes()
@@ -47,6 +53,12 @@ export default function Rooms() {
     loadRoomTypes()
     loadGuests()
   }, [])
+
+  useEffect(() => {
+    if (showExtendStay && extendDate) {
+      calculateExtendPreview()
+    }
+  }, [extendDate, showExtendStay])
 
   async function initializeRoomTypes() {
     try {
@@ -97,6 +109,224 @@ export default function Rooms() {
     }
   }
 
+  async function loadRoomTypes() {
+    try {
+      const { data } = await supabase
+        .from('room_types')
+        .select('*')
+      setRoomTypes(data || [])
+    } catch (error) {
+      console.error('Error loading room types:', error)
+    }
+  }
+
+  async function checkRoomAvailability(guest, newDepartureDate) {
+    try {
+      const { data: allGuests } = await supabase
+        .from('guests')
+        .select('*')
+        .neq('id', guest.id)
+        .neq('status', 'cancelled')
+
+      const currentDeparture = new Date(guest.date_of_departure)
+      const newDeparture = new Date(newDepartureDate)
+
+      for (const roomNumber of guest.room_numbers) {
+        const conflicts = allGuests?.filter(g => {
+          if (!g.room_numbers?.includes(roomNumber)) return false
+          
+          const guestArrival = new Date(g.date_of_arrival)
+          const guestDeparture = new Date(g.date_of_departure)
+          
+          return (
+            (guestArrival > currentDeparture && guestArrival < newDeparture) ||
+            (guestDeparture > currentDeparture && guestDeparture <= newDeparture) ||
+            (guestArrival <= currentDeparture && guestDeparture >= newDeparture)
+          )
+        })
+
+        if (conflicts && conflicts.length > 0) {
+          return {
+            available: false,
+            conflictRoom: roomNumber,
+            conflictGuest: conflicts[0]
+          }
+        }
+      }
+
+      return { available: true }
+    } catch (error) {
+      console.error('Error checking availability:', error)
+      return { available: false, error: 'Failed to check availability' }
+    }
+  }
+
+  async function calculateExtendPreview() {
+    if (!extendDate || !selectedGuestPopup) return
+
+    const newDepartureDate = new Date(extendDate)
+    const currentDeparture = new Date(selectedGuestPopup.date_of_departure)
+
+    if (newDepartureDate <= currentDeparture) {
+      setExtendError('New checkout date must be after current checkout date')
+      setExtendPreview(null)
+      return
+    }
+
+    const availabilityCheck = await checkRoomAvailability(selectedGuestPopup, extendDate)
+    
+    if (!availabilityCheck.available) {
+      if (availabilityCheck.conflictRoom) {
+        setExtendError(
+          `Room ${availabilityCheck.conflictRoom} is not available. It's booked by ${availabilityCheck.conflictGuest.name_with_initials} (${availabilityCheck.conflictGuest.grc_number}) from ${format(new Date(availabilityCheck.conflictGuest.date_of_arrival), 'MMM dd')} to ${format(new Date(availabilityCheck.conflictGuest.date_of_departure), 'MMM dd, yyyy')}`
+        )
+      } else {
+        setExtendError(availabilityCheck.error || 'Rooms not available for selected dates')
+      }
+      setExtendPreview(null)
+      return
+    }
+
+    setExtendError('')
+
+    const arrival = new Date(selectedGuestPopup.date_of_arrival)
+    let newNights = differenceInDays(newDepartureDate, arrival)
+    
+    if (newNights === 0 && selectedGuestPopup.date_of_arrival === extendDate) {
+      newNights = 1
+    }
+    
+    let additionalNights = differenceInDays(newDepartureDate, currentDeparture)
+    if (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure) {
+      if (newDepartureDate > currentDeparture) {
+        additionalNights = Math.max(0, newNights - 1)
+      }
+    }
+    
+    const numberOfRooms = selectedGuestPopup.room_numbers.length
+    const effectiveNights = selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)
+    const pricePerNight = parseFloat(selectedGuestPopup.total_room_charge) / (effectiveNights * numberOfRooms) || 0
+    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
+    const newTotalRoomCharge = parseFloat(selectedGuestPopup.total_room_charge) + additionalCharge
+
+    setExtendPreview({
+      currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
+      newDeparture: format(newDepartureDate, 'MMM dd, yyyy'),
+      currentNights: effectiveNights,
+      newNights,
+      additionalNights,
+      pricePerNight,
+      additionalCharge,
+      currentRoomCharge: parseFloat(selectedGuestPopup.total_room_charge),
+      newTotalRoomCharge
+    })
+  }
+
+  async function handleExtendStay(e) {
+    if (e) e.preventDefault()
+    
+    if (!extendDate || !extendPreview) {
+      setExtendError('Please select a valid extension date')
+      return
+    }
+
+    setExtendLoading(true)
+
+    try {
+      const availabilityCheck = await checkRoomAvailability(selectedGuestPopup, extendDate)
+      
+      if (!availabilityCheck.available) {
+        setExtendError('Room availability changed. Please try again.')
+        setExtendLoading(false)
+        return
+      }
+
+      const { error } = await supabase
+        .from('guests')
+        .update({
+          date_of_departure: extendDate,
+          number_of_nights: extendPreview.newNights,
+          total_room_charge: extendPreview.newTotalRoomCharge,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedGuestPopup.id)
+
+      if (error) throw error
+
+      // Reload data
+      const { data: updatedGuest } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('id', selectedGuestPopup.id)
+        .single()
+      
+      setSelectedGuestPopup(updatedGuest)
+      loadGuests()
+      loadRooms()
+      
+      setShowExtendStay(false)
+      setExtendDate('')
+      setExtendPreview(null)
+      setExtendError('')
+      
+      alert(`Stay extended successfully! New checkout date: ${format(new Date(extendDate), 'MMM dd, yyyy')}`)
+    } catch (error) {
+      console.error('Error extending stay:', error)
+      setExtendError('Failed to extend stay. Please try again.')
+    } finally {
+      setExtendLoading(false)
+    }
+  }
+
+  async function handleCheckIn(guestId, roomNumbers) {
+    if (!confirm('Are you sure you want to check in this guest?')) return
+
+    setCheckingIn(true)
+
+    try {
+      const { error: guestError } = await supabase
+        .from('guests')
+        .update({ 
+          status: 'checked_in',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', guestId)
+
+      if (guestError) throw guestError
+
+      for (const roomNumber of roomNumbers) {
+        const { error: roomError } = await supabase
+          .from('rooms')
+          .update({ 
+            status: 'occupied',
+            updated_at: new Date().toISOString()
+          })
+          .eq('room_number', roomNumber)
+
+        if (roomError) {
+          console.error(`Failed to update room ${roomNumber}:`, roomError)
+        }
+      }
+
+      // Reload data
+      const { data: updatedGuest } = await supabase
+        .from('guests')
+        .select('*')
+        .eq('id', guestId)
+        .single()
+      
+      setSelectedGuestPopup(updatedGuest)
+      loadGuests()
+      loadRooms()
+      
+      alert('Guest checked in successfully!')
+    } catch (error) {
+      console.error('Error checking in guest:', error)
+      alert('Failed to check in guest. Please try again.')
+    } finally {
+      setCheckingIn(false)
+    }
+  }
   async function loadRoomTypes() {
     try {
       const { data } = await supabase
@@ -744,6 +974,139 @@ export default function Rooms() {
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
                 </div>
+              ) : showExtendStay ? (
+                /* Extend Stay Form */
+                <form onSubmit={handleExtendStay} className="space-y-6">
+                  <div className="bg-dark-800 p-4 rounded-lg space-y-3">
+                    <h3 className="text-white font-semibold mb-3">Current Booking</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-400">Check-in</p>
+                        <p className="text-white font-medium">
+                          {format(new Date(selectedGuestPopup.date_of_arrival), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Current Check-out</p>
+                        <p className="text-white font-medium">
+                          {format(new Date(selectedGuestPopup.date_of_departure), 'MMM dd, yyyy')}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Current Nights</p>
+                        <p className="text-white font-medium">
+                          {selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Room(s)</p>
+                        <p className="text-white font-medium">{selectedGuestPopup.room_numbers.join(', ')}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="label">New Check-out Date *</label>
+                    <input
+                      type="date"
+                      value={extendDate}
+                      onChange={(e) => setExtendDate(e.target.value)}
+                      min={format(addDays(new Date(selectedGuestPopup.date_of_departure), 1), 'yyyy-MM-dd')}
+                      className="input-field"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select a date after {format(new Date(selectedGuestPopup.date_of_departure), 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+
+                  {extendError && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex items-start space-x-3">
+                      <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
+                      <p className="text-red-400 text-sm">{extendError}</p>
+                    </div>
+                  )}
+
+                  {extendPreview && (
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
+                      <h3 className="text-green-400 font-semibold flex items-center space-x-2">
+                        <CalendarPlus className="text-white" size={18} />
+                        <span>Extension Preview</span>
+                      </h3>
+                      
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">New Check-out Date</span>
+                          <span className="text-white font-medium">{extendPreview.newDeparture}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Additional Nights</span>
+                          <span className="text-white font-medium">+{extendPreview.additionalNights}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Total Nights</span>
+                          <span className="text-white font-medium">
+                            {extendPreview.currentNights} → {extendPreview.newNights}
+                          </span>
+                        </div>
+                        
+                        <div className="border-t border-green-500/20 pt-3 mt-3 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Price per Night (per room)</span>
+                            <span className="text-white font-medium">
+                              {formatCurrency(extendPreview.pricePerNight)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Additional Charges</span>
+                            <span className="text-green-400 font-medium">
+                              +{formatCurrency(extendPreview.additionalCharge)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-base">
+                            <span className="text-white font-semibold">New Total Room Charge</span>
+                            <span className="text-green-400 font-bold">
+                              {formatCurrency(extendPreview.newTotalRoomCharge)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-dark-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowExtendStay(false)
+                        setExtendDate('')
+                        setExtendPreview(null)
+                        setExtendError('')
+                      }}
+                      className="btn-secondary"
+                      disabled={extendLoading}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-primary flex items-center space-x-2"
+                      disabled={extendLoading || !extendPreview || !!extendError}
+                    >
+                      {extendLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Processing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CalendarPlus className="text-white" size={18} />
+                          <span>Confirm Extension</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
@@ -806,44 +1169,76 @@ export default function Rooms() {
                     </div>
                   </div>
 
-                  {/* Room-Only Bill Summary */}
-                  <div className="bg-primary-600/10 border border-primary-600/20 rounded-lg p-4">
-                    <h3 className="text-white font-semibold mb-3">Room-Only Bill</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Room Charge</span>
-                        <span className="text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
-                      </div>
-                      {selectedGuestPopup.advance_payment_amount > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Advance Paid</span>
-                          <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between pt-2 border-t border-primary-600/20">
-                        <span className="text-white font-bold">Balance (Room Only)</span>
-                        <span className="text-primary-400 font-bold text-lg">
-                          {formatCurrency(Math.max(0, (selectedGuestPopup.total_room_charge || 0) - (selectedGuestPopup.advance_payment_amount || 0)))}
+                  {/* Pricing and Actions */}
+                  <div className="space-y-4">
+                    <div className="bg-primary-600/10 border border-primary-600/20 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-white font-semibold">Bill Summary</h3>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-medium ${
+                          selectedGuestPopup.status === 'reserved'
+                            ? 'bg-blue-500/10 text-blue-400'
+                            : 'bg-green-500/10 text-green-400'
+                        }`}>
+                          {selectedGuestPopup.status === 'reserved' ? 'Reserved' : 'Checked In'}
                         </span>
                       </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Total Room Charge</span>
+                          <span className="text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
+                        </div>
+                        {selectedGuestPopup.advance_payment_amount > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Advance Paid</span>
+                            <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between pt-2 border-t border-primary-600/20">
+                          <span className="text-white font-bold">Balance Due</span>
+                          <span className="text-primary-400 font-bold text-lg">
+                            {formatCurrency(Math.max(0, (selectedGuestPopup.total_room_charge || 0) - (selectedGuestPopup.advance_payment_amount || 0)))}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    {purchases.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        * Excludes {purchases.length} additional purchase(s) totalling {formatCurrency(purchases.reduce((s, p) => s + p.total_price, 0))}
-                      </p>
-                    )}
 
-                    <button
-                      onClick={generateRoomBillPDF}
-                      className="w-full btn-primary flex items-center justify-center space-x-2 mt-4"
-                    >
-                      <Printer size={18} />
-                      <span>Print Room Bill</span>
-                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={generateRoomBillPDF}
+                        className="btn-secondary flex items-center justify-center space-x-2"
+                      >
+                        <Printer size={18} />
+                        <span>Room Bill</span>
+                      </button>
+
+                      {selectedGuestPopup.status === 'checked_in' ? (
+                        <button
+                          onClick={() => setShowExtendStay(true)}
+                          className="btn-primary flex items-center justify-center space-x-2"
+                        >
+                          <CalendarPlus className="text-white" size={18} />
+                          <span>Extend Stay</span>
+                        </button>
+                      ) : selectedGuestPopup.status === 'reserved' ? (
+                        <button
+                          onClick={() => handleCheckIn(selectedGuestPopup.id, selectedGuestPopup.room_numbers)}
+                          disabled={checkingIn}
+                          className="btn-primary flex items-center justify-center space-x-2"
+                        >
+                          {checkingIn ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <LogIn size={18} />
+                          )}
+                          <span>Check In</span>
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </>
               )}
             </div>
+
           </div>
         </div>
       )}
