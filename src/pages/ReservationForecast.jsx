@@ -216,10 +216,10 @@ export default function ReservationForecast() {
           table { border-collapse: collapse; width: 100%; }
           th, td { border: 1px solid #000; padding: 8px; text-align: center; font-size: 11px; }
           th { background-color: #c19440; color: white; font-weight: bold; }
-          .reserved { background-color: #ff6b6b; color: white; }
-          .checked_in { background-color: #4dabf7; color: white; }
-          .checked_out { background-color: #ffd700; color: #333; }
-          .available { background-color: #90ee90; }
+          .reserved { background-color: #f59e0b; color: white; }
+          .checked_in { background-color: #ef4444; color: white; }
+          .checked_out { background-color: #3b82f6; color: white; }
+          .available { background-color: #10b981; }
           .past { background-color: #d3d3d3; }
           .room-header { background-color: #f0f0f0; font-weight: bold; }
         </style>
@@ -277,10 +277,10 @@ export default function ReservationForecast() {
         </table>
         <br/>
         <p><strong>Legend:</strong></p>
-        <p><span style="background-color: #90ee90; padding: 5px; border: 1px solid #000;">Green</span> = Available | 
-           <span style="background-color: #ff6b6b; color:white; padding: 5px; border: 1px solid #000;">Red</span> = Reserved | 
-           <span style="background-color: #4dabf7; color:white; padding: 5px; border: 1px solid #000;">Blue</span> = Checked In | 
-           <span style="background-color: #ffd700; padding: 5px; border: 1px solid #000;">Yellow</span> = Checked Out | 
+        <p><span style="background-color: #10b981; padding: 5px; border: 1px solid #000;">Green</span> = Available | 
+           <span style="background-color: #f59e0b; color:white; padding: 5px; border: 1px solid #000;">Yellow</span> = Reserved | 
+           <span style="background-color: #ef4444; color:white; padding: 5px; border: 1px solid #000;">Red</span> = Checked In | 
+           <span style="background-color: #3b82f6; color:white; padding: 5px; border: 1px solid #000;">Blue</span> = Checked Out | 
            <span style="background-color: #d3d3d3; padding: 5px; border: 1px solid #000;">Gray</span> = Past Date</p>
         <p>Generated on: ${format(new Date(), 'PPpp')}</p>
       </body>
@@ -374,22 +374,22 @@ export default function ReservationForecast() {
             font-size: 8px;
           }
           .reserved { 
-            background-color: #ff6b6b;
+            background-color: #f59e0b;
             color: white;
             font-weight: bold;
           }
           .checked_in { 
-            background-color: #4dabf7;
+            background-color: #ef4444;
             color: white;
             font-weight: bold;
           }
           .checked_out { 
-            background-color: #ffd700;
-            color: #333;
+            background-color: #3b82f6;
+            color: white;
             font-weight: bold;
           }
           .available { 
-            background-color: #90ee90; 
+            background-color: #10b981; 
           }
           .past { 
             background-color: #d3d3d3; 
@@ -454,19 +454,19 @@ export default function ReservationForecast() {
         <div class="legend">
           <p><strong>Legend:</strong></p>
           <div class="legend-item">
-            <span class="legend-box" style="background-color: #90ee90;"></span>
+            <span class="legend-box" style="background-color: #10b981;"></span>
             <span>Available</span>
           </div>
           <div class="legend-item">
-            <span class="legend-box" style="background-color: #ff6b6b;"></span>
+            <span class="legend-box" style="background-color: #f59e0b;"></span>
             <span>Reserved</span>
           </div>
           <div class="legend-item">
-            <span class="legend-box" style="background-color: #4dabf7;"></span>
+            <span class="legend-box" style="background-color: #ef4444;"></span>
             <span>Checked In</span>
           </div>
           <div class="legend-item">
-            <span class="legend-box" style="background-color: #ffd700;"></span>
+            <span class="legend-box" style="background-color: #3b82f6;"></span>
             <span>Checked Out</span>
           </div>
           <div class="legend-item">
@@ -550,12 +550,12 @@ export default function ReservationForecast() {
                         isPast && !isOccupied
                           ? 'bg-gray-700/20 cursor-not-allowed'
                           : guest?.status === 'reserved'
-                          ? 'bg-red-500/30 hover:bg-red-500/40 cursor-pointer'
+                          ? 'bg-yellow-500/60 hover:bg-yellow-500/80 cursor-pointer'
                           : guest?.status === 'checked_in'
-                          ? 'bg-blue-500/30 hover:bg-blue-500/40 cursor-pointer'
+                          ? 'bg-red-500/60 hover:bg-red-500/80 cursor-pointer'
                           : guest?.status === 'checked_out'
-                          ? 'bg-yellow-500/30 hover:bg-yellow-500/40 cursor-pointer'
-                          : 'bg-green-500/20 hover:bg-green-500/30 cursor-pointer'
+                          ? 'bg-blue-500/60 hover:bg-blue-500/80 cursor-pointer'
+                          : 'bg-green-500/40 hover:bg-green-500/60 cursor-pointer'
                       }`}
                       title={
                         isPast && !isOccupied 
@@ -602,7 +602,7 @@ export default function ReservationForecast() {
           onClick={() => setShowReservationChart(true)}
           className="btn-primary flex items-center space-x-2"
         >
-          <Calendar size={20} />
+          <Calendar className="text-white" size={20} />
           <span>Reservation Chart</span>
         </button>
       </div>
@@ -737,19 +737,19 @@ export default function ReservationForecast() {
 
               <div className="flex items-center flex-wrap gap-4 mt-4 text-sm">
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-green-500/20 border border-green-500/50 rounded"></div>
+                  <div className="w-4 h-4 bg-green-500/40 border border-green-500/50 rounded"></div>
                   <span className="text-gray-400">Available</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-red-500/30 border border-red-500/50 rounded"></div>
+                  <div className="w-4 h-4 bg-yellow-500/60 border border-yellow-500/50 rounded"></div>
                   <span className="text-gray-400">Reserved</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-blue-500/30 border border-blue-500/50 rounded"></div>
+                  <div className="w-4 h-4 bg-red-500/60 border border-red-500/50 rounded"></div>
                   <span className="text-gray-400">Check-in</span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 bg-yellow-500/30 border border-yellow-500/50 rounded"></div>
+                  <div className="w-4 h-4 bg-blue-500/60 border border-blue-500/50 rounded"></div>
                   <span className="text-gray-400">Check-out</span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -845,7 +845,7 @@ export default function ReservationForecast() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-gray-400 text-sm font-medium">Total Rooms</h3>
-            <Calendar className="text-orange-400" size={20} />
+            <Calendar className="text-white" size={20} />
           </div>
           <p className="text-xl font-bold text-orange-400">{rooms.length}</p>
           <p className="text-xs text-gray-500 mt-2">In property</p>

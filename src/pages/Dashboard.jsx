@@ -483,9 +483,9 @@ export default function Dashboard() {
                   
                   let bgColor = 'bg-green-500/20 hover:bg-green-500/30'
                   if (guest) {
-                    if (guest.status === 'reserved') bgColor = 'bg-red-500/30 hover:bg-red-500/40'
-                    else if (guest.status === 'checked_in') bgColor = 'bg-blue-500/30 hover:bg-blue-500/40'
-                    else if (guest.status === 'checked_out') bgColor = 'bg-yellow-500/30 hover:bg-yellow-500/40'
+                    if (guest.status === 'reserved') bgColor = 'bg-yellow-500/30 hover:bg-yellow-500/40'
+                    else if (guest.status === 'checked_in') bgColor = 'bg-red-500/30 hover:bg-red-500/40'
+                    else if (guest.status === 'checked_out') bgColor = 'bg-blue-500/30 hover:bg-blue-500/40'
                   } else if (isPast) {
                     bgColor = 'bg-gray-700/20'
                   }
@@ -556,7 +556,7 @@ export default function Dashboard() {
       icon: Calendar,
       color: 'from-orange-500 to-orange-600',
       bgColor: 'bg-orange-500/10',
-      iconColor: 'text-orange-400'
+      iconColor: 'text-white'
     },
     {
       title: 'Pending Checkouts',
@@ -588,7 +588,7 @@ export default function Dashboard() {
             onClick={() => setShowAvailabilityChecker(!showAvailabilityChecker)}
             className="inline-flex items-center space-x-2 btn-secondary"
           >
-            <CalendarSearch size={20} />
+            <CalendarSearch className="text-white" size={20} />
             <span>Check Availability</span>
           </button>
           <Link
@@ -606,7 +606,7 @@ export default function Dashboard() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <CalendarSearch className="text-primary-400" size={20} />
+              <CalendarSearch className="text-white" size={20} />
               <h2 className="text-lg font-semibold text-white">Room Availability for Time Period</h2>
             </div>
             <button
@@ -933,7 +933,7 @@ export default function Dashboard() {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="text-gray-400" size={20} />
+            <Calendar className="text-white" size={20} />
             <h2 className="text-lg font-semibold text-white">Reservation Chart</h2>
           </div>
           <div className="flex items-center space-x-2">
@@ -986,7 +986,7 @@ export default function Dashboard() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <Calendar className="text-gray-400" size={20} />
+              <Calendar className="text-white" size={20} />
               <h2 className="text-lg font-semibold text-white">Booking Calendar</h2>
             </div>
             <div className="flex items-center space-x-2">
