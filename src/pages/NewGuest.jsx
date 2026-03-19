@@ -701,7 +701,7 @@ export default function NewGuest() {
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-500 dark:text-gray-400"
+          className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-gray-400"
           disabled={loading}
         >
           <ArrowLeft size={20} />
@@ -1012,7 +1012,7 @@ export default function NewGuest() {
                 name="reservation_number"
                 value={formData.reservation_number}
                 onChange={handleChange}
-                className="input-field bg-gray-800"
+                className="input-field"
                 readOnly
                 disabled={loading}
               />
@@ -1076,7 +1076,7 @@ export default function NewGuest() {
                   }}
                   className={`p-4 rounded-lg border-2 transition-all text-center ${
                     formData.room_type === type.code
-                      ? 'border-primary-600 bg-primary-600/10 text-white'
+                      ? 'border-primary-600 bg-primary-600/10 text-primary-700 dark:text-white'
                       : 'border-slate-200 dark:border-slate-700 hover:border-slate-600 text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:bg-slate-800'
                   }`}
                   disabled={loading}
@@ -1130,7 +1130,7 @@ export default function NewGuest() {
                       onClick={() => !room.isOccupied && handleRoomSelection(room.room_number)}
                       className={`p-4 rounded-lg border-2 transition-all relative ${
                         formData.room_numbers.includes(room.room_number)
-                          ? 'border-primary-600 bg-primary-600/20 text-white shadow-lg shadow-primary-600/20'
+                          ? 'border-primary-600 bg-primary-600/20 text-primary-700 dark:text-white shadow-lg shadow-primary-600/20'
                           : room.isOccupied
                           ? 'border-red-900/50 bg-red-900/10 text-red-400 opacity-60 cursor-not-allowed'
                           : 'border-slate-200 dark:border-slate-700 hover:border-primary-500/50 text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:bg-slate-800'

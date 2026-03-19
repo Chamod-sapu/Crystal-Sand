@@ -1030,7 +1030,7 @@ export default function FoodBeverage() {
 
               {/* Guest Info */}
               {currentGuest && (
-                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
                   <div className="flex items-center space-x-2">
                     <User className="text-primary-400" size={18} />
                     <div>
@@ -1170,7 +1170,7 @@ export default function FoodBeverage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 p-3 bg-slate-700 rounded-lg">
+                  <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-slate-500 dark:text-gray-400">Total</span>
                       <span className="text-primary-400 font-bold text-lg">
@@ -1230,21 +1230,21 @@ export default function FoodBeverage() {
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
                               >
                                 -
                               </button>
                               <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{consumption.quantity}</span>
                               <button
                                 onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
                               >
                                 +
                               </button>
                             </div>
                           </td>
-                          <td className="py-4 px-4 text-gray-300">{formatCurrency(consumption.unit_price)}</td>
-                          <td className="py-4 px-4 text-primary-400 font-bold">{formatCurrency(consumption.total_price)}</td>
+                           <td className="py-4 px-4 text-slate-600 dark:text-gray-300">{formatCurrency(consumption.unit_price)}</td>
+                           <td className="py-4 px-4 text-primary-600 dark:text-primary-400 font-bold">{formatCurrency(consumption.total_price)}</td>
                           <td className="py-4 px-4 text-slate-500 dark:text-gray-400 text-sm">
                             {format(new Date(consumption.consumed_at), 'MMM dd, HH:mm')}
                           </td>
@@ -1323,7 +1323,7 @@ export default function FoodBeverage() {
               </div>
 
               {/* Table Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
                 <div>
                   <div className="text-xs text-gray-500">Table Number</div>
                   <div className="text-slate-900 dark:text-white font-medium text-lg">{selectedTable.table_number}</div>
@@ -1395,7 +1395,7 @@ export default function FoodBeverage() {
                                 <button
                                   key={item.id}
                                   type="button"
-                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
+                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-slate-900 dark:text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
                                   onClick={() => {
                                     setNewRestaurantOrder({
                                       ...newRestaurantOrder,
@@ -1508,14 +1508,14 @@ export default function FoodBeverage() {
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleUpdateOrderQuantity(order.id, order.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
                               >
                                 -
                               </button>
                               <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{order.quantity}</span>
                               <button
-                                onClick={() => handleUpdateOrderQuantity(order.id, order.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
+                                onClick={() => handleUpdateRestaurantQuantity(order.id, order.quantity + 1)}
+                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
                               >
                                 +
                               </button>

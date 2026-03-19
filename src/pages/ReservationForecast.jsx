@@ -6,7 +6,7 @@ import {
   generateCalendarOccupancy
 } from '../utils/availability'
 import { formatCurrency } from '../utils/calculations'
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths } from 'date-fns'
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from 'date-fns'
 import { Calendar, TrendingUp, Users, DollarSign, X, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 
