@@ -501,8 +501,17 @@ export default function Rooms() {
     ) || null
   }
 
+  const getEffectiveStatus = (room) => {
+    const guest = getGuestForRoom(room.room_number)
+    if (guest) {
+      return guest.status === 'checked_in' ? 'occupied' : 'reserved'
+    }
+    return room.status || 'available'
+  }
+
   const filteredRooms = rooms.filter(room => {
-    const matchesStatus = filterStatus === 'all' || room.status === filterStatus
+    const effectiveStatus = getEffectiveStatus(room)
+    const matchesStatus = filterStatus === 'all' || effectiveStatus === filterStatus
     const search = searchGRC.toLowerCase().trim()
     if (!search) return matchesStatus
     
@@ -523,11 +532,15 @@ export default function Rooms() {
   const roomTypeMap = Object.fromEntries(roomTypes.map(rt => [rt.code, rt.name]))
 
   const statsByType = roomTypes.reduce((acc, type) => {
-    const count = rooms.filter(r => r.room_type === type.code).length
-    const occupied = rooms.filter(r => r.room_type === type.code && r.status === 'occupied').length
+    const roomsOfType = rooms.filter(r => r.room_type === type.code)
+    const count = roomsOfType.length
+    const occupied = roomsOfType.filter(r => getEffectiveStatus(r) === 'occupied').length
+    const reserved = roomsOfType.filter(r => getEffectiveStatus(r) === 'reserved').length
+    const available = roomsOfType.filter(r => getEffectiveStatus(r) === 'available').length
+    
     return {
       ...acc,
-      [type.code]: { count, occupied, available: count - occupied }
+      [type.code]: { count, occupied, reserved, available }
     }
   }, {})
 
@@ -813,7 +826,7 @@ export default function Rooms() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {roomTypes.map(type => {
-          const stats = statsByType[type.code] || { count: 0, occupied: 0, available: 0 }
+          const stats = statsByType[type.code] || { count: 0, occupied: 0, reserved: 0, available: 0 }
           return (
             <div key={type.code} className="card p-4">
               <div className="text-sm text-gray-400 mb-2">{type.name}</div>
@@ -830,6 +843,12 @@ export default function Rooms() {
                   <span className="text-xs text-orange-400">Occupied</span>
                   <span className="text-sm font-bold text-orange-400">{stats.occupied}</span>
                 </div>
+                {stats.reserved > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-yellow-500">Reserved</span>
+                    <span className="text-sm font-bold text-yellow-500">{stats.reserved}</span>
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -849,9 +868,9 @@ export default function Rooms() {
               <div
                 key={room.id}
                 className={`card p-5 border-2 transition-all hover:shadow-lg relative ${
-                  room.status === 'available'
+                  getEffectiveStatus(room) === 'available'
                     ? 'border-green-500'
-                    : room.status === 'occupied'
+                    : getEffectiveStatus(room) === 'occupied'
                     ? 'border-red-500'
                     : 'border-yellow-500'
                 }`}
@@ -909,13 +928,13 @@ export default function Rooms() {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400">Status</span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        room.status === 'available'
+                        getEffectiveStatus(room) === 'available'
                           ? 'bg-green-500/20 text-green-400'
-                          : room.status === 'occupied'
+                          : getEffectiveStatus(room) === 'occupied'
                           ? 'bg-red-500/20 text-red-400'
                           : 'bg-yellow-500/20 text-yellow-400'
                       }`}>
-                        {room.status.charAt(0).toUpperCase() + room.status.slice(1)}
+                        {getEffectiveStatus(room).charAt(0).toUpperCase() + getEffectiveStatus(room).slice(1)}
                       </span>
                     </div>
                   </div>
