@@ -7,23 +7,26 @@ import GuestDetails from './pages/GuestDetails'
 import Rooms from './pages/Rooms'
 import ReservationForecast from './pages/ReservationForecast'
 import FoodBeverage from './pages/FoodBeverage'
+import { ThemeProvider } from './context/ThemeContext'
 
 function App() {
   return (
-    <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/guests" element={<GuestList />} />
-          <Route path="/guests/new" element={<NewGuest />} />
-          <Route path="/guests/:id" element={<GuestDetails />} />
-          <Route path="/rooms" element={<Rooms />} />
-          <Route path="/forecast" element={<ReservationForecast />} />
-          <Route path="/food-beverage" element={<FoodBeverage />} />
-          <Route path="*" element={<div>404 - Page not found</div>} />
-        </Routes>
-      </Layout>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/guests" element={<GuestList />} />
+            <Route path="/guests/new" element={<NewGuest />} />
+            <Route path="/guests/:id" element={<GuestDetails />} />
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/forecast" element={<ReservationForecast />} />
+            <Route path="/food-beverage" element={<FoodBeverage />} />
+            <Route path="*" element={<div>404 - Page not found</div>} />
+          </Routes>
+        </Layout>
+      </BrowserRouter>
+    </ThemeProvider>
   )
 }
 

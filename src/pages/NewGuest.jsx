@@ -701,19 +701,19 @@ export default function NewGuest() {
       <div className="flex items-center space-x-4">
         <button
           onClick={() => navigate(-1)}
-          className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+          className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-500 dark:text-gray-400"
           disabled={loading}
         >
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-3xl font-bold text-white">New Guest Registration</h1>
-          <p className="text-gray-400 mt-1">Fill in guest details for check-in</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">New Guest Registration</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Fill in guest details for check-in</p>
         </div>
       </div>
 
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-4">Registration Type</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Registration Type</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             type="button"
@@ -721,21 +721,21 @@ export default function NewGuest() {
             className={`p-6 rounded-lg border-2 transition-all text-left ${
               registrationType === 'reservation'
                 ? 'border-primary-600 bg-primary-600/10'
-                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+                : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-slate-50/50 dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-100 dark:bg-slate-800'
             }`}
             disabled={loading}
           >
             <div className="flex items-center space-x-3 mb-2">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                registrationType === 'reservation' ? 'border-primary-600' : 'border-dark-600'
+                registrationType === 'reservation' ? 'border-primary-600' : 'border-slate-300 dark:border-slate-600'
               }`}>
                 {registrationType === 'reservation' && (
                   <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
                 )}
               </div>
-              <span className="text-xl font-bold text-white">Reservation</span>
+              <span className="text-xl font-bold text-slate-900 dark:text-white">Reservation</span>
             </div>
-            <p className="text-sm text-gray-400 ml-8">
+            <p className="text-sm text-slate-500 dark:text-gray-400 ml-8">
               Create a reservation for a future check-in. Rooms will be reserved but not marked as occupied.
             </p>
           </button>
@@ -746,21 +746,21 @@ export default function NewGuest() {
             className={`p-6 rounded-lg border-2 transition-all text-left ${
               registrationType === 'checkin'
                 ? 'border-primary-600 bg-primary-600/10'
-                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+                : 'border-slate-200 dark:border-slate-700 hover:border-slate-600 hover:bg-slate-100 dark:bg-slate-800'
             }`}
             disabled={loading}
           >
             <div className="flex items-center space-x-3 mb-2">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                registrationType === 'checkin' ? 'border-primary-600' : 'border-dark-600'
+                registrationType === 'checkin' ? 'border-primary-600' : 'border-slate-600'
               }`}>
                 {registrationType === 'checkin' && (
                   <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
                 )}
               </div>
-              <span className="text-xl font-bold text-white">Direct Check-in</span>
+              <span className="text-xl font-bold text-slate-900 dark:text-white">Direct Check-in</span>
             </div>
-            <p className="text-sm text-gray-400 ml-8">
+            <p className="text-sm text-slate-500 dark:text-gray-400 ml-8">
               Check-in guest immediately. Rooms will be marked as occupied and guest status will be "checked in".
             </p>
           </button>
@@ -771,21 +771,21 @@ export default function NewGuest() {
             className={`p-6 rounded-lg border-2 transition-all text-left ${
               registrationType === 'online_booking'
                 ? 'border-primary-600 bg-primary-600/10'
-                : 'border-dark-700 hover:border-dark-600 hover:bg-dark-800'
+                : 'border-slate-200 dark:border-slate-700 hover:border-slate-600 hover:bg-slate-100 dark:bg-slate-800'
             }`}
             disabled={loading}
           >
             <div className="flex items-center space-x-3 mb-2">
               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                registrationType === 'online_booking' ? 'border-primary-600' : 'border-dark-600'
+                registrationType === 'online_booking' ? 'border-primary-600' : 'border-slate-600'
               }`}>
                 {registrationType === 'online_booking' && (
                   <div className="w-3 h-3 bg-primary-600 rounded-full"></div>
                 )}
               </div>
-              <span className="text-xl font-bold text-white">Online Booking</span>
+              <span className="text-xl font-bold text-slate-900 dark:text-white">Online Booking</span>
             </div>
-            <p className="text-sm text-gray-400 ml-8">
+            <p className="text-sm text-slate-500 dark:text-gray-400 ml-8">
               Booking made through online platforms like Agoda, Booking.com, or a Travelling Agent.
             </p>
           </button>
@@ -793,7 +793,7 @@ export default function NewGuest() {
 
         {/* Online Booking Sub-options */}
         {registrationType === 'online_booking' && (
-          <div className="mt-4 pt-4 border-t border-dark-700">
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">Online Booking Source *</label>
@@ -849,7 +849,7 @@ export default function NewGuest() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">1</span>
             <span>Guest Details</span>
           </h2>
@@ -931,7 +931,7 @@ export default function NewGuest() {
             </div>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-dark-700">
+          <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
             <label className="label mb-3">Passport / NIC Document (PDF)</label>
             
             {!uploadedFile ? (
@@ -941,19 +941,19 @@ export default function NewGuest() {
                   className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
                     isUploading 
                       ? 'border-gray-600 bg-gray-800/50 cursor-not-allowed' 
-                      : 'border-dark-600 hover:border-primary-500 hover:bg-dark-800'
+                      : 'border-slate-600 hover:border-primary-500 hover:bg-slate-100 dark:bg-slate-800'
                   }`}
                 >
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     {isUploading ? (
                       <>
                         <div className="w-10 h-10 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mb-3" />
-                        <p className="text-sm text-gray-400">Uploading... {uploadProgress}%</p>
+                        <p className="text-sm text-slate-500 dark:text-gray-400">Uploading... {uploadProgress}%</p>
                       </>
                     ) : (
                       <>
-                        <Upload className="w-10 h-10 mb-3 text-gray-400" />
-                        <p className="mb-2 text-sm text-gray-400">
+                        <Upload className="w-10 h-10 mb-3 text-slate-500 dark:text-gray-400" />
+                        <p className="mb-2 text-sm text-slate-500 dark:text-gray-400">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
                 <p className="text-xs text-gray-500">PDF only (MAX. 2.5MB)</p>
@@ -971,13 +971,13 @@ export default function NewGuest() {
                 </label>
               </div>
             ) : (
-              <div className="flex items-center justify-between p-4 bg-dark-800 rounded-lg border border-dark-700">
+              <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-primary-600/20 rounded-lg">
                     <FileText className="w-6 h-6 text-primary-400" />
                   </div>
                   <div>
-                    <p className="text-white font-medium">{uploadedFile.name}</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{uploadedFile.name}</p>
                     <p className="text-xs text-gray-500">
                       {formatFileSize(uploadedFile.size)} • Will be saved with GRC number
                     </p>
@@ -986,7 +986,7 @@ export default function NewGuest() {
                 <button
                   type="button"
                   onClick={handleRemoveFile}
-                  className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
                   disabled={loading}
                 >
                   <Trash2 size={18} />
@@ -1000,7 +1000,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">2</span>
             <span>Reservation Details</span>
           </h2>
@@ -1049,7 +1049,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">3</span>
             <span>Room Selection</span>
           </h2>
@@ -1077,7 +1077,7 @@ export default function NewGuest() {
                   className={`p-4 rounded-lg border-2 transition-all text-center ${
                     formData.room_type === type.code
                       ? 'border-primary-600 bg-primary-600/10 text-white'
-                      : 'border-dark-700 hover:border-dark-600 text-gray-400 hover:bg-dark-800'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-600 text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:bg-slate-800'
                   }`}
                   disabled={loading}
                 >
@@ -1092,7 +1092,7 @@ export default function NewGuest() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <label className="label">Select Room(s) <span className="text-red-500">*</span></label>
-              <div className="text-sm text-gray-400">
+              <div className="text-sm text-slate-500 dark:text-gray-400">
                 {formData.room_numbers.length > 0 && (
                   <div className="space-y-1 text-right">
                     <p className="text-primary-400 font-medium">
@@ -1102,7 +1102,7 @@ export default function NewGuest() {
                       {formData.room_numbers.map(rn => {
                         const rInfo = allRooms.find(r => r.room_number === rn)
                         return (
-                          <span key={rn} className="bg-dark-700 px-2 py-1 rounded text-xs border border-dark-600">
+                          <span key={rn} className="bg-slate-700 px-2 py-1 rounded text-xs border border-slate-600">
                             {rn} ({rInfo?.room_type})
                           </span>
                         )
@@ -1133,7 +1133,7 @@ export default function NewGuest() {
                           ? 'border-primary-600 bg-primary-600/20 text-white shadow-lg shadow-primary-600/20'
                           : room.isOccupied
                           ? 'border-red-900/50 bg-red-900/10 text-red-400 opacity-60 cursor-not-allowed'
-                          : 'border-dark-700 hover:border-primary-500/50 text-gray-400 hover:bg-dark-800'
+                          : 'border-slate-200 dark:border-slate-700 hover:border-primary-500/50 text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:bg-slate-800'
                       }`}
                       disabled={loading || room.isOccupied}
                     >
@@ -1229,7 +1229,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">4</span>
             <span>Check-in & Check-out</span>
           </h2>
@@ -1301,7 +1301,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">5</span>
             <span>Advance Payment (Optional)</span>
           </h2>
@@ -1350,7 +1350,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">6</span>
             <span>Discount (Optional)</span>
           </h2>
@@ -1391,20 +1391,20 @@ export default function NewGuest() {
           </div>
 
           {formData.room_numbers.length > 0 && formData.date_of_arrival && formData.date_of_departure && (
-            <div className="mt-6 pt-6 border-t border-dark-700">
-              <h3 className="text-lg font-semibold text-white mb-4">Pricing Summary</h3>
+            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Pricing Summary</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 bg-dark-800 rounded-lg">
-                  <span className="text-gray-400">Original Room Rate</span>
-                  <span className="text-white font-bold text-lg">
+                <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                  <span className="text-slate-500 dark:text-gray-400">Original Room Rate</span>
+                  <span className="text-slate-900 dark:text-white font-bold text-lg">
                     {formatCurrency(displayCharges.originalRate)}
                   </span>
                 </div>
                 
                 {formData.discount_type && formData.discount_amount > 0 && (
                   <>
-                    <div className="flex items-center justify-between p-3 bg-dark-800 rounded-lg">
-                      <span className="text-gray-400">
+                    <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                      <span className="text-slate-500 dark:text-gray-400">
                         Discount ({formData.discount_type === 'percentage' ? `${formData.discount_amount}%` : 'Fixed'})
                       </span>
                       <span className="text-red-400 font-bold">
@@ -1413,7 +1413,7 @@ export default function NewGuest() {
                     </div>
                     
                     <div className="flex items-center justify-between p-4 bg-primary-600/10 border border-primary-600/20 rounded-lg">
-                      <span className="text-white font-semibold text-lg">Final Amount</span>
+                      <span className="text-slate-900 dark:text-white font-semibold text-lg">Final Amount</span>
                       <span className="text-primary-400 font-bold text-2xl">
                         {formatCurrency(displayCharges.finalRate)}
                       </span>
@@ -1423,7 +1423,7 @@ export default function NewGuest() {
                 
                 {(!formData.discount_type || formData.discount_amount === 0) && (
                   <div className="flex items-center justify-between p-4 bg-primary-600/10 border border-primary-600/20 rounded-lg">
-                    <span className="text-white font-semibold text-lg">Total Amount</span>
+                    <span className="text-slate-900 dark:text-white font-semibold text-lg">Total Amount</span>
                     <span className="text-primary-400 font-bold text-2xl">
                       {formatCurrency(displayCharges.originalRate)}
                     </span>
@@ -1439,7 +1439,7 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center space-x-2">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">7</span>
             <span>Special Requests & Remarks</span>
           </h2>
