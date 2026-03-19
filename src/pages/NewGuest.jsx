@@ -259,28 +259,20 @@ export default function NewGuest() {
         break
         
       case 'number_of_adults':
-        const maxAdults = formData.room_type === 'SGL' ? 1 : 
-                         formData.room_type === 'DBL' ? 2 : 
-                         formData.room_type === 'TPL' ? 3 : 
-                         formData.room_type === 'QUAD' ? 4 :
-                         formData.room_type === 'FAMILY' ? 4 :
-                         formData.room_type === '6PAX' ? 6 : 4
-        if (value < 1 || value > maxAdults) {
-          errors[name] = `Must be between 1 and ${maxAdults} for ${formData.room_type} room`
+        const selectedRoomsForAdults = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+        const totalAdultCapacity = selectedRoomsForAdults.reduce((sum, r) => sum + (r.capacity_adults || 0), 0) || 100 // fallback if none selected
+        if (value < 1 || (formData.room_numbers.length > 0 && value > totalAdultCapacity)) {
+          errors[name] = `Total adults (${value}) exceeds total capacity of selected rooms (${totalAdultCapacity})`
         } else {
           delete errors[name]
         }
         break
         
       case 'number_of_children':
-        const maxChildren = formData.room_type === 'SGL' ? 0 : 
-                           formData.room_type === 'DBL' ? 1 : 
-                           formData.room_type === 'TPL' ? 2 : 
-                           formData.room_type === 'QUAD' ? 2 :
-                           formData.room_type === 'FAMILY' ? 3 :
-                           formData.room_type === '6PAX' ? 3 : 3
-        if (value < 0 || value > maxChildren) {
-          errors[name] = `Must be between 0 and ${maxChildren} for ${formData.room_type} room`
+        const selectedRoomsForChildren = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+        const totalChildCapacity = selectedRoomsForChildren.reduce((sum, r) => sum + (r.capacity_children || 0), 0) || 100
+        if (value < 0 || (formData.room_numbers.length > 0 && value > totalChildCapacity)) {
+          errors[name] = `Total children (${value}) exceeds total child capacity of selected rooms (${totalChildCapacity})`
         } else {
           delete errors[name]
         }
@@ -481,11 +473,7 @@ export default function NewGuest() {
       if (isSelected) {
         newRooms = prev.room_numbers.filter(r => r !== roomNumber)
       } else {
-        if (formData.room_type === 'SGL' && prev.room_numbers.length >= 1) {
-          newRooms = [roomNumber]
-        } else {
-          newRooms = [...prev.room_numbers, roomNumber]
-        }
+        newRooms = [...prev.room_numbers, roomNumber]
       }
       
       return {
@@ -569,6 +557,11 @@ export default function NewGuest() {
       }
 
       const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+      const uniqueTypes = [...new Set(selectedRooms.map(r => r.room_type))].sort()
+      const typeSummary = uniqueTypes.length > 1 
+        ? `Mixed (${uniqueTypes.join(', ')})` 
+        : uniqueTypes[0] || formData.room_type
+
       const totalRoomCharge = selectedRooms.reduce((total, room) => {
         const roomCharge = calculateRoomCharges(
           formData.date_of_arrival,
@@ -593,6 +586,7 @@ export default function NewGuest() {
         .insert([{
           grc_number: grcNumber,
           ...formData,
+          room_type: typeSummary,
           advance_payment_method: formData.advance_payment_method || null,
           discount_type: formData.discount_type || null,
           voucher_number: formData.voucher_number || null,
@@ -1075,25 +1069,10 @@ export default function NewGuest() {
                   key={type.code}
                   type="button"
                   onClick={() => {
-                    setFormData(prev => { 
-                      let newAdults = prev.number_of_adults
-                      if (prev.number_of_adults > type.maxAdults) {
-                        newAdults = type.maxAdults
-                      }
-                      
-                      let newChildren = prev.number_of_children
-                      if (prev.number_of_children > type.maxChildren) {
-                        newChildren = type.maxChildren
-                      }
-                      
-                      return {
-                        ...prev, 
-                        room_type: type.code, 
-                        room_numbers: [],
-                        number_of_adults: newAdults,
-                        number_of_children: newChildren
-                      }
-                    })
+                    setFormData(prev => ({
+                      ...prev, 
+                      room_type: type.code
+                    }))
                   }}
                   className={`p-4 rounded-lg border-2 transition-all text-center ${
                     formData.room_type === type.code
@@ -1113,11 +1092,23 @@ export default function NewGuest() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <label className="label">Select Room(s) <span className="text-red-500">*</span></label>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-gray-400">
                 {formData.room_numbers.length > 0 && (
-                  <span className="text-primary-400">
-                    Selected: {formData.room_numbers.sort().join(', ')}
-                  </span>
+                  <div className="space-y-1 text-right">
+                    <p className="text-primary-400 font-medium">
+                      Selected: {formData.room_numbers.length} Room(s)
+                    </p>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {formData.room_numbers.map(rn => {
+                        const rInfo = allRooms.find(r => r.room_number === rn)
+                        return (
+                          <span key={rn} className="bg-dark-700 px-2 py-1 rounded text-xs border border-dark-600">
+                            {rn} ({rInfo?.room_type})
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -1187,13 +1178,9 @@ export default function NewGuest() {
                 value={formData.number_of_adults}
                 onChange={(e) => {
                   const value = parseInt(e.target.value) || 1
-                  const maxAdults = formData.room_type === 'SGL' ? 1 : 
-                                  formData.room_type === 'DBL' ? 2 : 
-                                  formData.room_type === 'TPL' ? 3 : 
-                                  formData.room_type === 'QUAD' ? 4 :
-                                  formData.room_type === 'FAMILY' ? 4 :
-                                  formData.room_type === '6PAX' ? 6 : 4
-                  const adjustedValue = Math.min(Math.max(1, value), maxAdults)
+                  const selectedRoomsForCap = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+                  const totalCapacity = selectedRoomsForCap.reduce((sum, r) => sum + (r.capacity_adults || 0), 0) || 100
+                  const adjustedValue = Math.min(Math.max(1, value), totalCapacity)
                   setFormData(prev => ({ ...prev, number_of_adults: adjustedValue }))
                   validateField('number_of_adults', adjustedValue)
                 }}
@@ -1202,6 +1189,9 @@ export default function NewGuest() {
                 required
                 disabled={loading}
               />
+              <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                Total adult capacity of selected rooms: {allRooms.filter(r => formData.room_numbers.includes(r.room_number)).reduce((sum, r) => sum + (r.capacity_adults || 0), 0) || '0'}
+              </p>
               {validationErrors.number_of_adults && (
                 <p className="text-red-500 text-xs mt-1">{validationErrors.number_of_adults}</p>
               )}
@@ -1214,13 +1204,9 @@ export default function NewGuest() {
                 value={formData.number_of_children}
                 onChange={(e) => {
                   const value = parseInt(e.target.value) || 0
-                  const maxChildren = formData.room_type === 'SGL' ? 0 : 
-                                     formData.room_type === 'DBL' ? 1 : 
-                                     formData.room_type === 'TPL' ? 2 : 
-                                     formData.room_type === 'QUAD' ? 2 :
-                                     formData.room_type === 'FAMILY' ? 3 :
-                                     formData.room_type === '6PAX' ? 3 : 3
-                  const adjustedValue = Math.min(Math.max(0, value), maxChildren)
+                  const selectedRoomsForCap = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
+                  const totalChildCapacity = selectedRoomsForCap.reduce((sum, r) => sum + (r.capacity_children || 0), 0) || 100
+                  const adjustedValue = Math.min(Math.max(0, value), totalChildCapacity)
                   setFormData(prev => ({ 
                     ...prev, 
                     number_of_children: adjustedValue
@@ -1231,6 +1217,9 @@ export default function NewGuest() {
                 min="0"
                 disabled={loading}
               />
+              <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider">
+                Total child capacity of selected rooms: {allRooms.filter(r => formData.room_numbers.includes(r.room_number)).reduce((sum, r) => sum + (r.capacity_children || 0), 0) || '0'}
+              </p>
               {validationErrors.number_of_children && (
                 <p className="text-red-500 text-xs mt-1">{validationErrors.number_of_children}</p>
               )}
