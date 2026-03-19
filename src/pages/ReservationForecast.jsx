@@ -514,14 +514,14 @@ export default function ReservationForecast() {
       <div className="w-full">
         <table className="w-full border-collapse text-[10px] sm:text-xs table-fixed">
           <thead>
-            <tr className="bg-dark-800">
-              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16">Room</th>
-              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
+            <tr className="bg-slate-100 dark:bg-slate-800">
+              <th className="border border-slate-200 dark:border-slate-700 p-1 text-left w-12 sm:w-16">Room</th>
+              <th className="border border-slate-200 dark:border-slate-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
               {days.map((day, index) => {
                 const isPast = day < today
                 const isTodayDate = isToday && isToday(day)
                 return (
-                  <th key={index} className={`border border-dark-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
+                  <th key={index} className={`border border-slate-200 dark:border-slate-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
                     <div className={`${isPast ? 'text-gray-600' : 'text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
                     <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
                   </th>
@@ -531,11 +531,11 @@ export default function ReservationForecast() {
           </thead>
           <tbody>
             {sortedRooms.map((room) => (
-              <tr key={room.id} className="hover:bg-dark-800/50">
-                <td className="border border-dark-700 p-1 font-bold truncate">
+              <tr key={room.id} className="hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                <td className="border border-slate-200 dark:border-slate-700 p-1 font-bold truncate">
                   {room.room_number}
                 </td>
-                <td className="border border-dark-700 p-1 truncate hidden md:table-cell text-[10px] text-gray-400">
+                <td className="border border-slate-200 dark:border-slate-700 p-1 truncate hidden md:table-cell text-[10px] text-slate-500 dark:text-gray-400">
                   {room.room_type}
                 </td>
                 {days.map((day, index) => {
@@ -547,7 +547,7 @@ export default function ReservationForecast() {
                   return (
                     <td
                       key={index}
-                      className={`border border-dark-700 p-0 text-center relative ${
+                      className={`border border-slate-200 dark:border-slate-700 p-0 text-center relative ${
                         isPast && !isOccupied
                           ? 'bg-gray-700/20 cursor-not-allowed'
                           : guest?.status === 'reserved'
@@ -567,7 +567,7 @@ export default function ReservationForecast() {
                       }
                     >
                       {guest && (
-                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-white'} hidden lg:block truncate`}>
+                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-slate-900 dark:text-white'} hidden lg:block truncate`}>
                           {guest.room_type}{guest.meal_plan || ''}
                         </div>
                       )}
@@ -596,14 +596,14 @@ export default function ReservationForecast() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Reservation Forecast</h1>
-          <p className="text-gray-400 mt-1">Analytics and planning for upcoming reservations</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Reservation Forecast</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Analytics and planning for upcoming reservations</p>
         </div>
         <button
           onClick={() => setShowReservationChart(true)}
           className="btn-primary flex items-center space-x-2"
         >
-          <Calendar className="text-white" size={20} />
+          <Calendar className="text-slate-900 dark:text-white" size={20} />
           <span>Reservation Chart</span>
         </button>
       </div>
@@ -611,15 +611,15 @@ export default function ReservationForecast() {
       {/* Reservation Chart Modal */}
       {showReservationChart && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg w-full max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b border-dark-800">
+          <div className="bg-white dark:bg-slate-900 rounded-lg w-full max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white">Monthly Reservation Chart</h2>
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Monthly Reservation Chart</h2>
                 <button
                   onClick={() => setShowReservationChart(false)}
-                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={20} className="text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
 
@@ -631,7 +631,7 @@ export default function ReservationForecast() {
                     className={`px-4 py-2 rounded-lg transition-colors ${
                       !useCustomRange 
                         ? 'bg-primary-600 text-white' 
-                        : 'bg-dark-800 text-gray-400 hover:bg-dark-700'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
                     Monthly View
@@ -641,7 +641,7 @@ export default function ReservationForecast() {
                     className={`px-4 py-2 rounded-lg transition-colors ${
                       useCustomRange 
                         ? 'bg-primary-600 text-white' 
-                        : 'bg-dark-800 text-gray-400 hover:bg-dark-700'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
                     Custom Range
@@ -655,18 +655,18 @@ export default function ReservationForecast() {
                   <div className="flex items-center space-x-4">
                     <button
                       onClick={() => setChartMonth(subMonths(chartMonth, 1))}
-                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
-                      <ChevronLeft size={20} className="text-gray-400" />
+                      <ChevronLeft size={20} className="text-slate-500 dark:text-gray-400" />
                     </button>
-                    <span className="text-white font-medium text-lg min-w-[160px] text-center">
+                    <span className="text-slate-900 dark:text-white font-medium text-lg min-w-[160px] text-center">
                       {format(chartMonth, 'MMMM yyyy')}
                     </span>
                     <button
                       onClick={() => setChartMonth(addMonths(chartMonth, 1))}
-                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                     >
-                      <ChevronRight size={20} className="text-gray-400" />
+                      <ChevronRight size={20} className="text-slate-500 dark:text-gray-400" />
                     </button>
                   </div>
 
@@ -711,8 +711,8 @@ export default function ReservationForecast() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-400">
-                      Showing: <span className="text-white font-medium">
+                    <div className="text-sm text-slate-500 dark:text-gray-400">
+                      Showing: <span className="text-slate-900 dark:text-white font-medium">
                         {format(new Date(customDateRange.start), 'MMM dd, yyyy')} - {format(new Date(customDateRange.end), 'MMM dd, yyyy')}
                       </span>
                     </div>
@@ -739,26 +739,26 @@ export default function ReservationForecast() {
               <div className="flex items-center flex-wrap gap-4 mt-4 text-sm">
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-green-500/40 border border-green-500/50 rounded"></div>
-                  <span className="text-gray-400">Available</span>
+                  <span className="text-slate-500 dark:text-gray-400">Available</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-yellow-500/60 border border-yellow-500/50 rounded"></div>
-                  <span className="text-gray-400">Reserved</span>
+                  <span className="text-slate-500 dark:text-gray-400">Reserved</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-red-500/60 border border-red-500/50 rounded"></div>
-                  <span className="text-gray-400">Check-in</span>
+                  <span className="text-slate-500 dark:text-gray-400">Check-in</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-blue-500/60 border border-blue-500/50 rounded"></div>
-                  <span className="text-gray-400">Check-out</span>
+                  <span className="text-slate-500 dark:text-gray-400">Check-out</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-4 h-4 bg-gray-700/20 border border-gray-700/50 rounded"></div>
-                  <span className="text-gray-400">Past Date</span>
+                  <span className="text-slate-500 dark:text-gray-400">Past Date</span>
                 </div>
                 <div className="text-gray-500">
-                  Total Rooms: <span className="text-white font-medium">{rooms.length}</span>
+                  Total Rooms: <span className="text-slate-900 dark:text-white font-medium">{rooms.length}</span>
                 </div>
               </div>
             </div>
@@ -777,7 +777,7 @@ export default function ReservationForecast() {
       )}
 
       <div className="card p-6">
-        <h2 className="text-lg font-bold text-white mb-4">Forecast Period</h2>
+        <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Forecast Period</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="label">Start Date</label>
@@ -818,7 +818,7 @@ export default function ReservationForecast() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-400 text-sm font-medium">Occupancy Rate</h3>
+            <h3 className="text-slate-500 dark:text-gray-400 text-sm font-medium">Occupancy Rate</h3>
             <TrendingUp className="text-primary-400" size={20} />
           </div>
           <p className="text-xl font-bold text-primary-400">{forecastData.occupancyPercentage}%</p>
@@ -827,7 +827,7 @@ export default function ReservationForecast() {
 
         <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-400 text-sm font-medium">Expected Revenue</h3>
+            <h3 className="text-slate-500 dark:text-gray-400 text-sm font-medium">Expected Revenue</h3>
             <DollarSign className="text-green-400" size={20} />
           </div>
           <p className="text-xl font-bold text-green-400">{formatCurrency(forecastData.expectedRevenue)}</p>
@@ -836,7 +836,7 @@ export default function ReservationForecast() {
 
         <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-400 text-sm font-medium">Upcoming Reservations</h3>
+            <h3 className="text-slate-500 dark:text-gray-400 text-sm font-medium">Upcoming Reservations</h3>
             <Users className="text-blue-400" size={20} />
           </div>
           <p className="text-xl font-bold text-blue-400">{forecastData.upcomingReservations}</p>
@@ -845,8 +845,8 @@ export default function ReservationForecast() {
 
         <div className="card p-6">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-gray-400 text-sm font-medium">Total Rooms</h3>
-            <Calendar className="text-white" size={20} />
+            <h3 className="text-slate-500 dark:text-gray-400 text-sm font-medium">Total Rooms</h3>
+            <Calendar className="text-slate-900 dark:text-white" size={20} />
           </div>
           <p className="text-xl font-bold text-orange-400">{rooms.length}</p>
           <p className="text-xs text-gray-500 mt-2">In property</p>
@@ -855,7 +855,7 @@ export default function ReservationForecast() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Occupancy Trend (Last 14 Days)</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Occupancy Trend (Last 14 Days)</h2>
           {forecastData.occupancyTrend.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={forecastData.occupancyTrend}>
@@ -888,7 +888,7 @@ export default function ReservationForecast() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Room Type Distribution</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Room Type Distribution</h2>
           {forecastData.roomTypeDistribution.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -925,7 +925,7 @@ export default function ReservationForecast() {
       </div>
 
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-4">Daily Occupancy</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Daily Occupancy</h2>
         {forecastData.dailyOccupancy.length > 0 ? (
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={forecastData.dailyOccupancy}>
@@ -952,7 +952,7 @@ export default function ReservationForecast() {
       </div>
 
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-6">Upcoming Reservations</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Upcoming Reservations</h2>
         <div className="space-y-3">
           {getUpcomingReservations(
             roomTypeFilter === 'all'
@@ -966,10 +966,10 @@ export default function ReservationForecast() {
                 ? guests
                 : guests.filter(g => g.room_type === roomTypeFilter)
             ).slice(0, 10).map(guest => (
-              <div key={guest.id} className="p-4 bg-dark-800 rounded-lg flex items-center justify-between">
+              <div key={guest.id} className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="text-white font-medium">{guest.name_with_initials}</h3>
-                  <p className="text-sm text-gray-400">
+                  <h3 className="text-slate-900 dark:text-white font-medium">{guest.name_with_initials}</h3>
+                  <p className="text-sm text-slate-500 dark:text-gray-400">
                     {format(new Date(guest.date_of_arrival), 'MMM dd')} - {format(new Date(guest.date_of_departure), 'MMM dd')} • {guest.room_numbers.join(', ')}
                   </p>
                 </div>

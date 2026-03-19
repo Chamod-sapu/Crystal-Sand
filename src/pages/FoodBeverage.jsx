@@ -893,11 +893,11 @@ export default function FoodBeverage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center space-x-3">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center space-x-3">
             <Coffee size={32} className="text-primary-400" />
             <span>F & B Management</span>
           </h1>
-          <p className="text-gray-400 mt-1">Manage Food and Beverage</p>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage Food and Beverage</p>
         </div>
         <button
           onClick={() => setShowManageRestaurantItems(true)}
@@ -924,7 +924,7 @@ export default function FoodBeverage() {
 
       {/* Rooms Section */}
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-6">Rooms</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Rooms</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-4">
           {filteredRooms.map(room => {
             const status = getRoomStatus(room)
@@ -939,12 +939,12 @@ export default function FoodBeverage() {
                   getRoomStatusColor(status)
                 } ${
                   status === 'occupied'
-                    ? 'bg-dark-800 hover:bg-dark-700 cursor-pointer hover:scale-105'
-                    : 'bg-dark-900 opacity-50 cursor-not-allowed'
+                    ? 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer hover:scale-105'
+                    : 'bg-white dark:bg-slate-900 opacity-50 cursor-not-allowed'
                 }`}
               >
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white mb-2">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
                     NO {room.room_number}
                   </div>
                   <div className={`text-xs font-medium ${
@@ -955,7 +955,7 @@ export default function FoodBeverage() {
                     {status.toUpperCase()}
                   </div>
                   {guest && (
-                    <div className="mt-2 text-xs text-gray-400 truncate">
+                    <div className="mt-2 text-xs text-slate-500 dark:text-gray-400 truncate">
                       {guest.name_with_initials}
                     </div>
                   )}
@@ -973,7 +973,7 @@ export default function FoodBeverage() {
 
       {/* Restaurant Section */}
       <div className="card p-6">
-        <h2 className="text-xl font-bold text-white mb-6">Restaurant</h2>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Restaurant</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-4">
           {tables.map(table => {
             const orderCount = getTableOrderCount(table.id)
@@ -984,10 +984,10 @@ export default function FoodBeverage() {
                 onClick={() => handleTableClick(table)}
                 className={`relative p-6 rounded-lg border-2 transition-all duration-200 ${
                   getTableStatusColor(table.status)
-                } bg-dark-800 hover:bg-dark-700 cursor-pointer hover:scale-105`}
+                } bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer hover:scale-105`}
               >
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-white mb-2">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
                     {table.table_number}
                   </div>
                   <div className={`text-xs font-medium ${
@@ -1012,44 +1012,44 @@ export default function FoodBeverage() {
       {/* Room Consumption Panel */}
       {showPanel && selectedRoom && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-end animate-in fade-in duration-300">
-          <div className="bg-dark-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
             {/* Panel Header */}
-            <div className="bg-dark-800 border-b border-dark-700 p-6">
+            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                   <ShoppingCart size={24} className="text-primary-400" />
                   <span>Room {selectedRoom.room_number} - F&B Consumption</span>
                 </h2>
                 <button
                   onClick={closePanel}
-                  className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <X size={24} className="text-gray-400" />
+                  <X size={24} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
 
               {/* Guest Info */}
               {currentGuest && (
-                <div className="grid grid-cols-2 gap-4 p-4 bg-dark-700 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
                   <div className="flex items-center space-x-2">
                     <User className="text-primary-400" size={18} />
                     <div>
                       <div className="text-xs text-gray-500">Guest Name</div>
-                      <div className="text-white font-medium">{currentGuest.name_with_initials}</div>
+                      <div className="text-slate-900 dark:text-white font-medium">{currentGuest.name_with_initials}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Calendar className="text-white" size={18} />
+                    <Calendar className="text-slate-900 dark:text-white" size={18} />
                     <div>
                       <div className="text-xs text-gray-500">GRC Number</div>
                       <div className="text-primary-400 font-medium">{currentGuest.grc_number}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Calendar className="text-white" size={18} />
+                    <Calendar className="text-slate-900 dark:text-white" size={18} />
                     <div>
                       <div className="text-xs text-gray-500">Check-in</div>
-                      <div className="text-white font-medium">
+                      <div className="text-slate-900 dark:text-white font-medium">
                         {format(new Date(currentGuest.date_of_arrival), 'MMM dd, yyyy')}
                       </div>
                     </div>
@@ -1070,7 +1070,7 @@ export default function FoodBeverage() {
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Consumption Items</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Consumption Items</h3>
                 <button
                   onClick={() => setShowAddItem(true)}
                   className="btn-primary flex items-center space-x-2 text-sm"
@@ -1082,16 +1082,16 @@ export default function FoodBeverage() {
 
               {/* Add Item Form */}
               {showAddItem && (
-                <form onSubmit={handleAddItem} className="mb-6 p-6 bg-dark-800 rounded-lg border border-primary-600/20">
+                <form onSubmit={handleAddItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-primary-600/20">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-white font-semibold">Add New Item</h4>
+                    <h4 className="text-slate-900 dark:text-white font-semibold">Add New Item</h4>
                     <button
                       type="button"
                       onClick={() => {
                         setShowAddItem(false)
                         resetNewItem()
                       }}
-                      className="text-gray-400 hover:text-white transition-colors"
+                      className="text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
                     >
                       <X size={20} />
                     </button>
@@ -1113,7 +1113,7 @@ export default function FoodBeverage() {
                           placeholder="Type to search items..."
                         />
                         {showRoomItemDropdown && (
-                          <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                          <div className="absolute z-50 w-full mt-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                             {Array.from(new Map(restaurantItems
                               .filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase()))
                               .map(item => [item.item_name, item])).values())
@@ -1121,7 +1121,7 @@ export default function FoodBeverage() {
                                 <button
                                   key={item.id}
                                   type="button"
-                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-dark-700 last:border-0"
+                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
                                   onClick={() => {
                                     setNewItem({
                                       ...newItem,
@@ -1135,7 +1135,7 @@ export default function FoodBeverage() {
                                   }}
                                 >
                                   <div className="font-medium text-sm">{item.item_name}</div>
-                                  <div className="text-xs text-gray-400">{formatCurrency(item.unit_price)}</div>
+                                  <div className="text-xs text-slate-500 dark:text-gray-400">{formatCurrency(item.unit_price)}</div>
                                 </button>
                               ))}
                             {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase())).length === 0 && (
@@ -1163,16 +1163,16 @@ export default function FoodBeverage() {
                       <input
                         type="number"
                         value={newItem.unit_price}
-                        className="input-field bg-dark-900 cursor-not-allowed"
+                        className="input-field bg-white dark:bg-slate-900 cursor-not-allowed"
                         readOnly
                         tabIndex={-1}
                       />
                     </div>
                   </div>
 
-                  <div className="mt-4 p-3 bg-dark-700 rounded-lg">
+                  <div className="mt-4 p-3 bg-slate-700 rounded-lg">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">Total</span>
+                      <span className="text-slate-500 dark:text-gray-400">Total</span>
                       <span className="text-primary-400 font-bold text-lg">
                         {formatCurrency(newItem.quantity * newItem.unit_price)}
                       </span>
@@ -1207,20 +1207,20 @@ export default function FoodBeverage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-dark-700">
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Item Name</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Category</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Qty</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Unit Price</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Total</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Time</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Action</th>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Category</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Qty</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Unit Price</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Total</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Time</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {consumptions.map(consumption => (
-                        <tr key={consumption.id} className="border-b border-dark-800 hover:bg-dark-800/50">
-                          <td className="py-4 px-4 text-white font-medium">{consumption.item_name}</td>
+                        <tr key={consumption.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                          <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{consumption.item_name}</td>
                           <td className="py-4 px-4">
                             <span className="px-2 py-1 bg-primary-600/20 text-primary-400 rounded text-xs">
                               {consumption.category}
@@ -1230,14 +1230,14 @@ export default function FoodBeverage() {
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-dark-700 hover:bg-dark-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
                               >
                                 -
                               </button>
-                              <span className="text-white font-medium w-8 text-center">{consumption.quantity}</span>
+                              <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{consumption.quantity}</span>
                               <button
                                 onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-dark-700 hover:bg-dark-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
                               >
                                 +
                               </button>
@@ -1245,13 +1245,13 @@ export default function FoodBeverage() {
                           </td>
                           <td className="py-4 px-4 text-gray-300">{formatCurrency(consumption.unit_price)}</td>
                           <td className="py-4 px-4 text-primary-400 font-bold">{formatCurrency(consumption.total_price)}</td>
-                          <td className="py-4 px-4 text-gray-400 text-sm">
+                          <td className="py-4 px-4 text-slate-500 dark:text-gray-400 text-sm">
                             {format(new Date(consumption.consumed_at), 'MMM dd, HH:mm')}
                           </td>
                           <td className="py-4 px-4">
                             <button
                               onClick={() => handleDeleteItem(consumption.id)}
-                              className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
                             >
                               <Trash2 size={18} />
                             </button>
@@ -1266,26 +1266,26 @@ export default function FoodBeverage() {
 
             {/* Summary Footer */}
             {consumptions.length > 0 && summary && (
-              <div className="bg-dark-800 border-t border-dark-700 p-6">
+              <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-gray-400">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                     <span>Subtotal</span>
                     <span className="font-medium">{formatCurrency(summary.subtotal)}</span>
                   </div>
                   {settings?.service_charge_percentage > 0 && (
-                    <div className="flex items-center justify-between text-gray-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                       <span>Service Charge ({settings.service_charge_percentage}%)</span>
                       <span className="font-medium">{formatCurrency(summary.serviceCharge)}</span>
                     </div>
                   )}
                   {settings?.vat_percentage > 0 && (
-                    <div className="flex items-center justify-between text-gray-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                       <span>VAT ({settings.vat_percentage}%)</span>
                       <span className="font-medium">{formatCurrency(summary.vat)}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between pt-3 border-t border-dark-700">
-                    <span className="text-white font-bold text-xl">Grand Total</span>
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <span className="text-slate-900 dark:text-white font-bold text-xl">Grand Total</span>
                     <span className="text-primary-400 font-bold text-2xl">
                       {formatCurrency(summary.grandTotal)}
                     </span>
@@ -1306,27 +1306,27 @@ export default function FoodBeverage() {
       {/* Restaurant Order Panel */}
       {showRestaurantPanel && selectedTable && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-end animate-in fade-in duration-300">
-          <div className="bg-dark-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
             {/* Panel Header */}
-            <div className="bg-dark-800 border-b border-dark-700 p-6">
+            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white flex items-center space-x-2">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                   <Utensils size={24} className="text-primary-400" />
                   <span>Table {selectedTable.table_number} - Restaurant Orders</span>
                 </h2>
                 <button
                   onClick={closeRestaurantPanel}
-                  className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <X size={24} className="text-gray-400" />
+                  <X size={24} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
 
               {/* Table Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-dark-700 rounded-lg">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-700 rounded-lg">
                 <div>
                   <div className="text-xs text-gray-500">Table Number</div>
-                  <div className="text-white font-medium text-lg">{selectedTable.table_number}</div>
+                  <div className="text-slate-900 dark:text-white font-medium text-lg">{selectedTable.table_number}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-500">Status</div>
@@ -1344,7 +1344,7 @@ export default function FoodBeverage() {
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white">Orders</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Orders</h3>
                 <button
                   onClick={() => setShowAddRestaurantItem(true)}
                   className="btn-primary flex items-center space-x-2 text-sm"
@@ -1356,16 +1356,16 @@ export default function FoodBeverage() {
 
               {/* Add Order Form */}
               {showAddRestaurantItem && (
-                <form onSubmit={handleAddRestaurantOrder} className="mb-6 p-6 bg-dark-800 rounded-lg border border-primary-600/20">
+                <form onSubmit={handleAddRestaurantOrder} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-primary-600/20">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-white font-semibold">Add New Order</h4>
+                    <h4 className="text-slate-900 dark:text-white font-semibold">Add New Order</h4>
                     <button
                       type="button"
                       onClick={() => {
                         setShowAddRestaurantItem(false)
                         resetNewRestaurantOrder()
                       }}
-                      className="text-gray-400 hover:text-white transition-colors"
+                      className="text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
                     >
                       <X size={20} />
                     </button>
@@ -1387,7 +1387,7 @@ export default function FoodBeverage() {
                           placeholder="Type to search items..."
                         />
                         {showRestaurantItemDropdown && (
-                          <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-dark-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                          <div className="absolute z-50 w-full mt-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
                             {Array.from(new Map(restaurantItems
                               .filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase()))
                               .map(item => [item.item_name, item])).values())
@@ -1395,7 +1395,7 @@ export default function FoodBeverage() {
                                 <button
                                   key={item.id}
                                   type="button"
-                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-dark-700 last:border-0"
+                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
                                   onClick={() => {
                                     setNewRestaurantOrder({
                                       ...newRestaurantOrder,
@@ -1408,7 +1408,7 @@ export default function FoodBeverage() {
                                   }}
                                 >
                                   <div className="font-medium text-sm">{item.item_name}</div>
-                                  <div className="text-xs text-gray-400">{formatCurrency(item.unit_price)}</div>
+                                  <div className="text-xs text-slate-500 dark:text-gray-400">{formatCurrency(item.unit_price)}</div>
                                 </button>
                               ))}
                             {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase())).length === 0 && (
@@ -1436,7 +1436,7 @@ export default function FoodBeverage() {
                       <input
                         type="number"
                         value={newRestaurantOrder.unit_price}
-                        className="input-field bg-dark-900 cursor-not-allowed"
+                        className="input-field bg-white dark:bg-slate-900 cursor-not-allowed"
                         readOnly
                         tabIndex={-1}
                       />
@@ -1454,9 +1454,9 @@ export default function FoodBeverage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 p-3 bg-dark-700 rounded-lg">
+                  <div className="mt-4 p-3 bg-slate-700 rounded-lg">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-400">Total</span>
+                      <span className="text-slate-500 dark:text-gray-400">Total</span>
                       <span className="text-primary-400 font-bold text-lg">
                         {formatCurrency(newRestaurantOrder.quantity * newRestaurantOrder.unit_price)}
                       </span>
@@ -1491,31 +1491,31 @@ export default function FoodBeverage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b border-dark-700">
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Item Name</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Qty</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Unit Price</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Total</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Notes</th>
-                        <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Action</th>
+                      <tr className="border-b border-slate-200 dark:border-slate-700">
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Qty</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Unit Price</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Total</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Notes</th>
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {restaurantOrders.map(order => (
-                        <tr key={order.id} className="border-b border-dark-800 hover:bg-dark-800/50">
-                          <td className="py-4 px-4 text-white font-medium">{order.item_name}</td>
+                        <tr key={order.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                          <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{order.item_name}</td>
                           <td className="py-4 px-4">
                             <div className="flex items-center space-x-2">
                               <button
                                 onClick={() => handleUpdateOrderQuantity(order.id, order.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-dark-700 hover:bg-dark-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
                               >
                                 -
                               </button>
-                              <span className="text-white font-medium w-8 text-center">{order.quantity}</span>
+                              <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{order.quantity}</span>
                               <button
                                 onClick={() => handleUpdateOrderQuantity(order.id, order.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-dark-700 hover:bg-dark-600 rounded text-white text-sm"
+                                className="w-6 h-6 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded text-white text-sm"
                               >
                                 +
                               </button>
@@ -1523,13 +1523,13 @@ export default function FoodBeverage() {
                           </td>
                           <td className="py-4 px-4 text-gray-300">{formatCurrency(order.unit_price)}</td>
                           <td className="py-4 px-4 text-primary-400 font-bold">{formatCurrency(order.total_price)}</td>
-                          <td className="py-4 px-4 text-gray-400 text-sm">
+                          <td className="py-4 px-4 text-slate-500 dark:text-gray-400 text-sm">
                             {order.notes || '-'}
                           </td>
                           <td className="py-4 px-4">
                             <button
                               onClick={() => handleDeleteOrder(order.id)}
-                              className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
                             >
                               <Trash2 size={18} />
                             </button>
@@ -1544,26 +1544,26 @@ export default function FoodBeverage() {
 
             {/* Summary Footer */}
             {restaurantOrders.length > 0 && restaurantSummary && (
-              <div className="bg-dark-800 border-t border-dark-700 p-6">
+              <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6">
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between text-gray-400">
+                  <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                     <span>Subtotal</span>
                     <span className="font-medium">{formatCurrency(restaurantSummary.subtotal)}</span>
                   </div>
                   {settings?.service_charge_percentage > 0 && (
-                    <div className="flex items-center justify-between text-gray-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                       <span>Service Charge ({settings.service_charge_percentage}%)</span>
                       <span className="font-medium">{formatCurrency(restaurantSummary.serviceCharge)}</span>
                     </div>
                   )}
                   {settings?.vat_percentage > 0 && (
-                    <div className="flex items-center justify-between text-gray-400">
+                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
                       <span>VAT ({settings.vat_percentage}%)</span>
                       <span className="font-medium">{formatCurrency(restaurantSummary.vat)}</span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between pt-3 border-t border-dark-700">
-                    <span className="text-white font-bold text-xl">Grand Total</span>
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <span className="text-slate-900 dark:text-white font-bold text-xl">Grand Total</span>
                     <span className="text-primary-400 font-bold text-2xl">
                       {formatCurrency(restaurantSummary.grandTotal)}
                     </span>
@@ -1602,26 +1602,26 @@ export default function FoodBeverage() {
       {/* Manage Restaurant Items Modal */}
       {showManageRestaurantItems && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-dark-900 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-dark-800">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">Manage Restaurant Items</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Manage Restaurant Items</h2>
                 <button
                   onClick={() => {
                     setShowManageRestaurantItems(false)
                     resetNewRestaurantItem()
                   }}
-                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={20} className="text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               {/* Add/Edit Item Form */}
-              <form onSubmit={handleSaveRestaurantItem} className="mb-6 p-6 bg-dark-800 rounded-lg">
-                <h3 className="text-white font-semibold mb-4">
+              <form onSubmit={handleSaveRestaurantItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                <h3 className="text-slate-900 dark:text-white font-semibold mb-4">
                   {editingRestaurantItem ? 'Edit Item' : 'Add New Item'}
                 </h3>
                 
@@ -1712,12 +1712,12 @@ export default function FoodBeverage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-dark-700">
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Item Name</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Category</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Price</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
-                      <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Actions</th>
+                    <tr className="border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
+                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Category</th>
+                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Price</th>
+                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Status</th>
+                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1729,9 +1729,9 @@ export default function FoodBeverage() {
                       </tr>
                     ) : (
                       restaurantItems.map(item => (
-                        <tr key={item.id} className="border-b border-dark-800 hover:bg-dark-800/50">
+                        <tr key={item.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
                           <td className="py-4 px-4">
-                            <div className="text-white font-medium">{item.item_name}</div>
+                            <div className="text-slate-900 dark:text-white font-medium">{item.item_name}</div>
                             {item.description && (
                               <div className="text-xs text-gray-500 mt-1">{item.description}</div>
                             )}
@@ -1766,13 +1766,13 @@ export default function FoodBeverage() {
                                     is_available: item.is_available
                                   })
                                 }}
-                                className="p-2 hover:bg-dark-700 rounded-lg text-primary-400 transition-colors"
+                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-primary-400 transition-colors"
                               >
                                 <Edit2 size={18} />
                               </button>
                               <button
                                 onClick={() => handleDeleteRestaurantItem(item.id)}
-                                className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
                               >
                                 <Trash2 size={18} />
                               </button>

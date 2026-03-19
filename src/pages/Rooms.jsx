@@ -654,8 +654,8 @@ export default function Rooms() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Rooms Management</h1>
-          <p className="text-gray-400 mt-1">Manage hotel rooms and availability</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Rooms Management</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage hotel rooms and availability</p>
         </div>
         <button
           onClick={() => {
@@ -672,17 +672,17 @@ export default function Rooms() {
       {/* Modal Popup for Add/Edit Room */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-dark-800">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   {editingRoom ? 'Edit Room' : 'Add New Room'}
                 </h2>
                 <button
                   onClick={resetForm}
-                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={20} className="text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -773,7 +773,7 @@ export default function Rooms() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-dark-800">
+              <div className="flex items-center justify-end space-x-3 mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={resetForm}
@@ -804,19 +804,34 @@ export default function Rooms() {
               className="input-field w-full pl-10"
             />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg shadow-inner">
+              {['all', 'available', 'occupied', 'reserved'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setFilterStatus(status)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                    filterStatus === status
+                      ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm scale-110 z-10'
+                      : 'text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center space-x-4 ml-2 border-l border-slate-200 dark:border-slate-800 pl-4 hidden sm:flex">
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-green-500 rounded"></div>
-                <span className="text-sm text-gray-300">Available</span>
+                <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm shadow-green-500/50"></div>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Available</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-red-500 rounded"></div>
-                <span className="text-sm text-gray-300">Occupied</span>
+                <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm shadow-red-500/50"></div>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Occupied</span>
               </div>
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-yellow-500 rounded"></div>
-                <span className="text-sm text-gray-300">Reserved</span>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full shadow-sm shadow-yellow-500/50"></div>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Reserved</span>
               </div>
             </div>
           </div>
@@ -829,24 +844,24 @@ export default function Rooms() {
           const stats = statsByType[type.code] || { count: 0, occupied: 0, reserved: 0, available: 0 }
           return (
             <div key={type.code} className="card p-4">
-              <div className="text-sm text-gray-400 mb-2">{type.name}</div>
+              <div className="text-sm text-slate-500 dark:text-gray-400 mb-2">{type.name}</div>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">Total</span>
-                  <span className="text-lg font-bold text-white">{stats.count}</span>
+                  <span className="text-xs text-slate-500 dark:text-gray-500">Total</span>
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">{stats.count}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-green-400">Available</span>
-                  <span className="text-sm font-bold text-green-400">{stats.available}</span>
+                  <span className="text-xs text-green-600 dark:text-green-400">Available</span>
+                  <span className="text-sm font-bold text-green-600 dark:text-green-400">{stats.available}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-orange-400">Occupied</span>
-                  <span className="text-sm font-bold text-orange-400">{stats.occupied}</span>
+                  <span className="text-xs text-red-600 dark:text-red-400">Occupied</span>
+                  <span className="text-sm font-bold text-red-600 dark:text-red-400">{stats.occupied}</span>
                 </div>
                 {stats.reserved > 0 && (
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-yellow-500">Reserved</span>
-                    <span className="text-sm font-bold text-yellow-500">{stats.reserved}</span>
+                    <span className="text-xs text-yellow-600 dark:text-yellow-400">Reserved</span>
+                    <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{stats.reserved}</span>
                   </div>
                 )}
               </div>
@@ -869,10 +884,10 @@ export default function Rooms() {
                 key={room.id}
                 className={`card p-5 border-2 transition-all hover:shadow-lg relative ${
                   getEffectiveStatus(room) === 'available'
-                    ? 'border-green-500'
+                    ? 'border-green-500/50 dark:border-green-400/40'
                     : getEffectiveStatus(room) === 'occupied'
-                    ? 'border-red-500'
-                    : 'border-yellow-500'
+                    ? 'border-red-500/50 dark:border-red-400/40'
+                    : 'border-yellow-500/50 dark:border-yellow-400/40'
                 }`}
               >
                 {roomGuest && (
@@ -889,44 +904,44 @@ export default function Rooms() {
                 )}
                 <div className="space-y-3">
                   {/* Room Number - clickable if has guest */}
-                  <div className="text-center border-b border-dark-700 pb-3">
+                  <div className="text-center border-b border-slate-200 dark:border-slate-700 pb-3">
                     <button
                       onClick={() => roomGuest && handleRoomCardClick(room)}
                       className={`text-2xl font-bold ${
-                        roomGuest ? 'text-primary-400 hover:underline cursor-pointer' : 'text-white cursor-default'
+                        roomGuest ? 'text-primary-600 dark:text-primary-400 hover:underline cursor-pointer' : 'text-slate-900 dark:text-white cursor-default'
                       }`}
                       title={roomGuest ? 'Click to view guest details' : ''}
                     >
                       Room {room.room_number}
                     </button>
                     {roomGuest && (
-                      <div className="text-xs text-gray-400 mt-1 truncate">{roomGuest.name_with_initials}</div>
+                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-1 truncate">{roomGuest.name_with_initials}</div>
                     )}
                   </div>
 
                   {/* Room Details */}
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Type</span>
-                      <span className="text-white font-medium">
+                      <span className="text-slate-500 dark:text-gray-400">Type</span>
+                      <span className="text-slate-900 dark:text-white font-medium">
                         {roomTypeMap[room.room_type] || room.room_type}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Floor</span>
-                      <span className="text-white font-medium">Floor {room.floor || 1}</span>
+                      <span className="text-slate-500 dark:text-gray-400">Floor</span>
+                      <span className="text-slate-900 dark:text-white font-medium">Floor {room.floor || 1}</span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Base Price</span>
-                      <span className="text-primary-400 font-bold">
+                      <span className="text-slate-500 dark:text-gray-400">Base Price</span>
+                      <span className="text-primary-600 dark:text-primary-400 font-bold">
                         {formatCurrency(room.base_price)}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">Status</span>
+                      <span className="text-slate-500 dark:text-gray-400">Status</span>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         getEffectiveStatus(room) === 'available'
                           ? 'bg-green-500/20 text-green-400'
@@ -940,8 +955,8 @@ export default function Rooms() {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-3 border-t border-dark-700">
-                    <div className="text-gray-400 text-xs mb-2">Actions</div>
+                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <div className="text-slate-500 dark:text-gray-400 text-xs mb-2">Actions</div>
                     <div className="flex items-center justify-center space-x-2">
                       <button
                         onClick={() => handleEdit(room)}
@@ -969,21 +984,21 @@ export default function Rooms() {
       {/* Guest Details Popup */}
       {selectedGuestPopup && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-dark-800">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <User className="text-primary-400" size={24} />
                   <div>
-                    <h2 className="text-xl font-bold text-white">{selectedGuestPopup.name_with_initials}</h2>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedGuestPopup.name_with_initials}</h2>
                     <p className="text-primary-400 text-sm">{selectedGuestPopup.grc_number}</p>
                   </div>
                 </div>
                 <button
                   onClick={() => { setSelectedGuestPopup(null); setPurchases([]) }}
-                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={20} className="text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -996,30 +1011,30 @@ export default function Rooms() {
               ) : showExtendStay ? (
                 /* Extend Stay Form */
                 <form onSubmit={handleExtendStay} className="space-y-6">
-                  <div className="bg-dark-800 p-4 rounded-lg space-y-3">
-                    <h3 className="text-white font-semibold mb-3">Current Booking</h3>
+                  <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                    <h3 className="text-slate-900 dark:text-white font-semibold mb-3">Current Booking</h3>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <p className="text-gray-400">Check-in</p>
-                        <p className="text-white font-medium">
+                        <p className="text-slate-500 dark:text-gray-400">Check-in</p>
+                        <p className="text-slate-900 dark:text-white font-medium">
                           {format(new Date(selectedGuestPopup.date_of_arrival), 'MMM dd, yyyy')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Current Check-out</p>
-                        <p className="text-white font-medium">
+                        <p className="text-slate-500 dark:text-gray-400">Current Check-out</p>
+                        <p className="text-slate-900 dark:text-white font-medium">
                           {format(new Date(selectedGuestPopup.date_of_departure), 'MMM dd, yyyy')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Current Nights</p>
-                        <p className="text-white font-medium">
+                        <p className="text-slate-500 dark:text-gray-400">Current Nights</p>
+                        <p className="text-slate-900 dark:text-white font-medium">
                           {selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-400">Room(s)</p>
-                        <p className="text-white font-medium">{selectedGuestPopup.room_numbers.join(', ')}</p>
+                        <p className="text-slate-500 dark:text-gray-400">Room(s)</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{selectedGuestPopup.room_numbers.join(', ')}</p>
                       </div>
                     </div>
                   </div>
@@ -1049,41 +1064,41 @@ export default function Rooms() {
                   {extendPreview && (
                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
                       <h3 className="text-green-400 font-semibold flex items-center space-x-2">
-                        <CalendarPlus className="text-white" size={18} />
+                        <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                         <span>Extension Preview</span>
                       </h3>
                       
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-400">New Check-out Date</span>
-                          <span className="text-white font-medium">{extendPreview.newDeparture}</span>
+                          <span className="text-slate-500 dark:text-gray-400">New Check-out Date</span>
+                          <span className="text-slate-900 dark:text-white font-medium">{extendPreview.newDeparture}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Additional Nights</span>
-                          <span className="text-white font-medium">+{extendPreview.additionalNights}</span>
+                          <span className="text-slate-500 dark:text-gray-400">Additional Nights</span>
+                          <span className="text-slate-900 dark:text-white font-medium">+{extendPreview.additionalNights}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Total Nights</span>
-                          <span className="text-white font-medium">
+                          <span className="text-slate-500 dark:text-gray-400">Total Nights</span>
+                          <span className="text-slate-900 dark:text-white font-medium">
                             {extendPreview.currentNights} → {extendPreview.newNights}
                           </span>
                         </div>
                         
                         <div className="border-t border-green-500/20 pt-3 mt-3 space-y-2">
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Price per Night (per room)</span>
-                            <span className="text-white font-medium">
+                            <span className="text-slate-500 dark:text-gray-400">Price per Night (per room)</span>
+                            <span className="text-slate-900 dark:text-white font-medium">
                               {formatCurrency(extendPreview.pricePerNight)}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Additional Charges</span>
+                            <span className="text-slate-500 dark:text-gray-400">Additional Charges</span>
                             <span className="text-green-400 font-medium">
                               +{formatCurrency(extendPreview.additionalCharge)}
                             </span>
                           </div>
                           <div className="flex justify-between text-base">
-                            <span className="text-white font-semibold">New Total Room Charge</span>
+                            <span className="text-slate-900 dark:text-white font-semibold">New Total Room Charge</span>
                             <span className="text-green-400 font-bold">
                               {formatCurrency(extendPreview.newTotalRoomCharge)}
                             </span>
@@ -1093,7 +1108,7 @@ export default function Rooms() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-dark-800">
+                  <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                     <button
                       type="button"
                       onClick={() => {
@@ -1119,7 +1134,7 @@ export default function Rooms() {
                         </>
                       ) : (
                         <>
-                          <CalendarPlus className="text-white" size={18} />
+                          <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                           <span>Confirm Extension</span>
                         </>
                       )}
@@ -1132,58 +1147,58 @@ export default function Rooms() {
                     <div className="flex items-start space-x-3">
                       <CreditCard className="text-primary-400 mt-1" size={18} />
                       <div>
-                        <p className="text-gray-400 text-xs">NIC / Passport</p>
-                        <p className="text-white font-medium">{selectedGuestPopup.passport_nic}</p>
+                        <p className="text-slate-500 dark:text-gray-400 text-xs">NIC / Passport</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{selectedGuestPopup.passport_nic}</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
                       <Phone className="text-primary-400 mt-1" size={18} />
                       <div>
-                        <p className="text-gray-400 text-xs">Mobile</p>
-                        <p className="text-white font-medium">{selectedGuestPopup.mobile_number}</p>
+                        <p className="text-slate-500 dark:text-gray-400 text-xs">Mobile</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{selectedGuestPopup.mobile_number}</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <Calendar className="text-white mt-1" size={18} />
+                      <Calendar className="text-slate-900 dark:text-white mt-1" size={18} />
                       <div>
-                        <p className="text-gray-400 text-xs">Check-in</p>
-                        <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} {selectedGuestPopup.time_of_arrival}</p>
+                        <p className="text-slate-500 dark:text-gray-400 text-xs">Check-in</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{format(new Date(selectedGuestPopup.date_of_arrival), 'dd MMM yyyy')} {selectedGuestPopup.time_of_arrival}</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                      <Calendar className="text-white mt-1" size={18} />
+                      <Calendar className="text-slate-900 dark:text-white mt-1" size={18} />
                       <div>
-                        <p className="text-gray-400 text-xs">Check-out</p>
-                        <p className="text-white font-medium">{format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} {selectedGuestPopup.time_of_departure}</p>
+                        <p className="text-slate-500 dark:text-gray-400 text-xs">Check-out</p>
+                        <p className="text-slate-900 dark:text-white font-medium">{format(new Date(selectedGuestPopup.date_of_departure), 'dd MMM yyyy')} {selectedGuestPopup.time_of_departure}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-dark-800 rounded-lg p-4">
+                  <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
                     <div className="grid grid-cols-3 gap-3 text-center">
                       <div>
                         <p className="text-xs text-gray-500">Room(s)</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.room_numbers?.join(', ')}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.room_numbers?.join(', ')}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Room Type</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.room_type}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.room_type}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Meal Plan</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.meal_plan || 'N/A'}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.meal_plan || 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Adults</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.number_of_adults}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.number_of_adults}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Children</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.number_of_children}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.number_of_children}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Nights</p>
-                        <p className="text-white font-bold">{selectedGuestPopup.number_of_nights}</p>
+                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.number_of_nights}</p>
                       </div>
                     </div>
                   </div>
@@ -1192,7 +1207,7 @@ export default function Rooms() {
                   <div className="space-y-4">
                     <div className="bg-primary-600/10 border border-primary-600/20 rounded-lg p-4">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-white font-semibold">Bill Summary</h3>
+                        <h3 className="text-slate-900 dark:text-white font-semibold">Bill Summary</h3>
                         <span className={`px-3 py-1 rounded-full text-[10px] font-medium ${
                           selectedGuestPopup.status === 'reserved'
                             ? 'bg-blue-500/10 text-blue-400'
@@ -1203,17 +1218,17 @@ export default function Rooms() {
                       </div>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Total Room Charge</span>
-                          <span className="text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
+                          <span className="text-slate-500 dark:text-gray-400">Total Room Charge</span>
+                          <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
                         </div>
                         {selectedGuestPopup.advance_payment_amount > 0 && (
                           <div className="flex justify-between">
-                            <span className="text-gray-400">Advance Paid</span>
+                            <span className="text-slate-500 dark:text-gray-400">Advance Paid</span>
                             <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
                           </div>
                         )}
                         <div className="flex justify-between pt-2 border-t border-primary-600/20">
-                          <span className="text-white font-bold">Balance Due</span>
+                          <span className="text-slate-900 dark:text-white font-bold">Balance Due</span>
                           <span className="text-primary-400 font-bold text-lg">
                             {formatCurrency(Math.max(0, (selectedGuestPopup.total_room_charge || 0) - (selectedGuestPopup.advance_payment_amount || 0)))}
                           </span>
@@ -1235,7 +1250,7 @@ export default function Rooms() {
                           onClick={() => setShowExtendStay(true)}
                           className="btn-primary flex items-center justify-center space-x-2"
                         >
-                          <CalendarPlus className="text-white" size={18} />
+                          <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                           <span>Extend Stay</span>
                         </button>
                       ) : selectedGuestPopup.status === 'reserved' ? (

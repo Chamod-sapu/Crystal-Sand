@@ -20,9 +20,11 @@ import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../utils/calculations'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, isToday } from 'date-fns'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { useTheme } from '../context/ThemeContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { isDarkMode } = useTheme()
   const [stats, setStats] = useState({
     todayGuests: 0,
     monthGuests: 0,
@@ -374,7 +376,7 @@ export default function Dashboard() {
       <div className="h-[300px] flex flex-col">
         <div className="grid grid-cols-7 gap-1 mb-2">
           {weekDays.map(day => (
-            <div key={day} className="text-center text-xs font-medium text-gray-400 py-1">
+            <div key={day} className="text-center text-xs font-medium text-slate-500 dark:text-gray-400 py-1">
               {day}
             </div>
           ))}
@@ -451,14 +453,14 @@ export default function Dashboard() {
       <div className="w-full">
         <table className="w-full border-collapse text-[10px] sm:text-xs table-fixed">
           <thead>
-            <tr className="bg-dark-800">
-              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16">Room</th>
-              <th className="border border-dark-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
+            <tr className="bg-slate-100 dark:bg-slate-800">
+              <th className="border border-slate-200 dark:border-slate-700 p-1 text-left w-12 sm:w-16">Room</th>
+              <th className="border border-slate-200 dark:border-slate-700 p-1 text-left w-12 sm:w-16 hidden md:table-cell">Type</th>
               {days.map((day, index) => {
                 const isPast = day < today
                 const isTodayDate = isToday(day)
                 return (
-                  <th key={index} className={`border border-dark-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
+                  <th key={index} className={`border border-slate-200 dark:border-slate-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
                     <div className={`${isPast ? 'text-gray-600' : 'text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
                     <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
                   </th>
@@ -468,11 +470,11 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {sortedRooms.map((room) => (
-              <tr key={room.id} className="hover:bg-dark-800/50">
-                <td className="border border-dark-700 p-1 font-bold truncate">
+              <tr key={room.id} className="hover:bg-slate-100 dark:hover:bg-slate-800/50">
+                <td className="border border-slate-200 dark:border-slate-700 p-1 font-bold truncate">
                   {room.room_number}
                 </td>
-                <td className="border border-dark-700 p-1 truncate hidden md:table-cell text-[10px] text-gray-400">
+                <td className="border border-slate-200 dark:border-slate-700 p-1 truncate hidden md:table-cell text-[10px] text-slate-500 dark:text-gray-400">
                   {room.room_type}
                 </td>
                 {days.map((day, index) => {
@@ -485,7 +487,7 @@ export default function Dashboard() {
                     <td
                       key={index}
                       onClick={() => guest && handleGuestClick(guest.id)}
-                      className={`border border-dark-700 p-0 text-center relative ${
+                      className={`border border-slate-200 dark:border-slate-700 p-0 text-center relative ${
                         isPast && !isOccupied
                           ? 'bg-gray-700/20 cursor-not-allowed'
                           : guest?.status === 'reserved'
@@ -505,7 +507,7 @@ export default function Dashboard() {
                       }
                     >
                       {guest && (
-                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-white'} hidden lg:block truncate`}>
+                        <div className={`text-[8px] sm:text-[9px] font-bold ${isPast ? 'text-gray-500' : 'text-slate-900 dark:text-white'} hidden lg:block truncate`}>
                           {guest.room_type}{guest.meal_plan || ''}
                         </div>
                       )}
@@ -583,15 +585,15 @@ export default function Dashboard() {
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          <p className="text-gray-400 mt-1">Welcome to Crystal Sand Hotel Management</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Dashboard</h1>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Welcome to Crystal Sand Hotel Management</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowAvailabilityChecker(!showAvailabilityChecker)}
             className="inline-flex items-center space-x-2 btn-secondary"
           >
-            <CalendarSearch className="text-white" size={20} />
+            <CalendarSearch className="text-slate-900 dark:text-white" size={20} />
             <span>Check Availability</span>
           </button>
           <Link
@@ -609,12 +611,12 @@ export default function Dashboard() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <CalendarSearch className="text-white" size={20} />
-              <h2 className="text-lg font-semibold text-white">Room Availability for Time Period</h2>
+              <CalendarSearch className="text-slate-900 dark:text-white" size={20} />
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Room Availability for Time Period</h2>
             </div>
             <button
               onClick={() => setShowAvailabilityChecker(false)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
             >
               <X size={20} />
             </button>
@@ -622,7 +624,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
+              <label className="block text-sm font-medium text-slate-500 dark:text-gray-400 mb-2">
                 Start Date
               </label>
               <input
@@ -633,7 +635,7 @@ export default function Dashboard() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-400 mb-2">
+              <label className="block text-sm font-medium text-slate-500 dark:text-gray-400 mb-2">
                 End Date
               </label>
               <input
@@ -648,10 +650,10 @@ export default function Dashboard() {
           {availabilityStartDate && availabilityEndDate && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-md font-semibold text-white">
+                <h3 className="text-md font-semibold text-slate-900 dark:text-white">
                   Availability from {format(new Date(availabilityStartDate), 'MMM dd, yyyy')} to {format(new Date(availabilityEndDate), 'MMM dd, yyyy')}
                 </h3>
-                <div className="text-sm text-gray-400">
+                <div className="text-sm text-slate-500 dark:text-gray-400">
                   <span className="text-green-400 font-semibold">
                     {availableRoomsForPeriod.filter(r => r.isAvailable).length}
                   </span>
@@ -675,7 +677,7 @@ export default function Dashboard() {
                       }`}
                     >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-lg font-bold text-white">
+                        <span className="text-lg font-bold text-slate-900 dark:text-white">
                           Room {room.room_number}
                         </span>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -688,10 +690,10 @@ export default function Dashboard() {
                       </div>
                       
                       <div className="space-y-2 mb-3">
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-slate-500 dark:text-gray-400">
                           Type: <span className="text-gray-300">{room.room_type}</span>
                         </div>
-                        <div className="text-sm text-gray-400">
+                        <div className="text-sm text-slate-500 dark:text-gray-400">
                           Floor: <span className="text-gray-300">{room.floor || 1}</span>
                         </div>
                         <div className="text-sm text-primary-400 font-medium">
@@ -700,7 +702,7 @@ export default function Dashboard() {
                       </div>
 
                       {!room.isAvailable && room.occupiedBy.length > 0 && (
-                        <div className="pt-3 border-t border-dark-700">
+                        <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
                           <p className="text-xs text-gray-500 mb-2">Occupied by:</p>
                           <div className="space-y-1">
                             {room.occupiedBy.map(guest => (
@@ -727,8 +729,8 @@ export default function Dashboard() {
       <div className="card p-6">
         <div className="space-y-4">
           <div className="flex items-center space-x-2">
-            <Search className="text-gray-400" size={20} />
-            <h2 className="text-lg font-semibold text-white">Search</h2>
+            <Search className="text-slate-500 dark:text-gray-400" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Search</h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,7 +745,7 @@ export default function Dashboard() {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -760,7 +762,7 @@ export default function Dashboard() {
               {searchDate && (
                 <button
                   onClick={() => setSearchDate('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -790,7 +792,7 @@ export default function Dashboard() {
                 {/* Rooms Results */}
                 {searchResults.rooms.length > 0 && (
                   <div>
-                    <h3 className="text-md font-semibold text-white mb-3">
+                    <h3 className="text-md font-semibold text-slate-900 dark:text-white mb-3">
                       Rooms ({searchResults.rooms.length})
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -798,10 +800,10 @@ export default function Dashboard() {
                         <div
                           key={room.id}
                           onClick={() => handleRoomClick(room.id)}
-                          className="p-4 bg-dark-800 hover:bg-dark-700 rounded-lg cursor-pointer transition-colors border border-dark-700"
+                          className="p-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg cursor-pointer transition-colors border border-slate-200 dark:border-slate-700"
                         >
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-lg font-bold text-white">
+                            <span className="text-lg font-bold text-slate-900 dark:text-white">
                               Room {room.room_number}
                             </span>
                             <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -820,10 +822,10 @@ export default function Dashboard() {
                                 : room.status}
                             </span>
                           </div>
-                          <div className="text-sm text-gray-400">
+                          <div className="text-sm text-slate-500 dark:text-gray-400">
                             Type: <span className="text-gray-300">{room.room_type}</span>
                           </div>
-                          <div className="text-sm text-gray-400">
+                          <div className="text-sm text-slate-500 dark:text-gray-400">
                             Floor: <span className="text-gray-300">{room.floor || 1}</span>
                           </div>
                           <div className="text-sm text-primary-400 font-medium mt-2">
@@ -838,7 +840,7 @@ export default function Dashboard() {
                 {/* Reservations Results (when date is selected) */}
                 {searchResults.reservations.length > 0 && (
                   <div>
-                    <h3 className="text-md font-semibold text-white mb-3">
+                    <h3 className="text-md font-semibold text-slate-900 dark:text-white mb-3">
                       Reservations on {format(new Date(searchDate), 'MMM dd, yyyy')} ({searchResults.reservations.length})
                     </h3>
                     <div className="space-y-2">
@@ -846,20 +848,20 @@ export default function Dashboard() {
                         <div
                           key={reservation.id}
                           onClick={() => handleGuestClick(reservation.id)}
-                          className="p-4 bg-dark-800 hover:bg-dark-700 rounded-lg cursor-pointer transition-colors border border-dark-700"
+                          className="p-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg cursor-pointer transition-colors border border-slate-200 dark:border-slate-700"
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-white font-medium">
+                              <div className="text-slate-900 dark:text-white font-medium">
                                 {reservation.guest_name}
                               </div>
-                              <div className="text-sm text-gray-400 mt-1">
+                              <div className="text-sm text-slate-500 dark:text-gray-400 mt-1">
                                 GRC: <span className="text-primary-400">{reservation.grc_number}</span>
                               </div>
-                              <div className="text-sm text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-gray-400">
                                 Rooms: <span className="text-gray-300">{reservation.room_numbers.join(', ')}</span>
                               </div>
-                              <div className="text-sm text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-gray-400">
                                 {format(new Date(reservation.date_of_arrival), 'MMM dd')} - {format(new Date(reservation.date_of_departure), 'MMM dd, yyyy')}
                               </div>
                             </div>
@@ -867,7 +869,7 @@ export default function Dashboard() {
                               reservation.status === 'checked_in'
                                 ? 'bg-green-500/10 text-green-400'
                                 : reservation.status === 'checked_out'
-                                ? 'bg-gray-500/10 text-gray-400'
+                                ? 'bg-gray-500/10 text-slate-500 dark:text-gray-400'
                                 : 'bg-red-500/10 text-red-400'
                             }`}>
                               {reservation.status.replace('_', ' ')}
@@ -882,7 +884,7 @@ export default function Dashboard() {
                 {/* Guests Results */}
                 {searchResults.guests.length > 0 && !searchDate && (
                   <div>
-                    <h3 className="text-md font-semibold text-white mb-3">
+                    <h3 className="text-md font-semibold text-slate-900 dark:text-white mb-3">
                       Guests ({searchResults.guests.length})
                     </h3>
                     <div className="space-y-2">
@@ -890,20 +892,20 @@ export default function Dashboard() {
                         <div
                           key={guest.id}
                           onClick={() => handleGuestClick(guest.id)}
-                          className="p-4 bg-dark-800 hover:bg-dark-700 rounded-lg cursor-pointer transition-colors border border-dark-700"
+                          className="p-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg cursor-pointer transition-colors border border-slate-200 dark:border-slate-700"
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-white font-medium">
+                              <div className="text-slate-900 dark:text-white font-medium">
                                 {guest.name_with_initials}
                               </div>
-                              <div className="text-sm text-gray-400 mt-1">
+                              <div className="text-sm text-slate-500 dark:text-gray-400 mt-1">
                                 GRC: <span className="text-primary-400">{guest.grc_number}</span>
                               </div>
-                              <div className="text-sm text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-gray-400">
                                 Rooms: <span className="text-gray-300">{guest.room_numbers.join(', ')}</span>
                               </div>
-                              <div className="text-sm text-gray-400">
+                              <div className="text-sm text-slate-500 dark:text-gray-400">
                                 {format(new Date(guest.date_of_arrival), 'MMM dd')} - {format(new Date(guest.date_of_departure), 'MMM dd, yyyy')}
                               </div>
                             </div>
@@ -911,7 +913,7 @@ export default function Dashboard() {
                               guest.status === 'checked_in'
                                 ? 'bg-green-500/10 text-green-400'
                                 : guest.status === 'checked_out'
-                                ? 'bg-gray-500/10 text-gray-400'
+                                ? 'bg-gray-500/10 text-slate-500 dark:text-gray-400'
                                 : 'bg-red-500/10 text-red-400'
                             }`}>
                               {guest.status.replace('_', ' ')}
@@ -936,24 +938,24 @@ export default function Dashboard() {
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
-            <Calendar className="text-white" size={20} />
-            <h2 className="text-lg font-semibold text-white">Reservation Chart</h2>
+            <Calendar className="text-slate-900 dark:text-white" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Reservation Chart</h2>
           </div>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-              className="p-1 hover:bg-dark-700 rounded transition-colors"
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
             >
-              <ChevronLeft size={18} className="text-gray-400" />
+              <ChevronLeft size={18} className="text-slate-500 dark:text-gray-400" />
             </button>
-            <span className="text-white font-medium text-sm min-w-[100px] text-center">
+            <span className="text-slate-900 dark:text-white font-medium text-sm min-w-[100px] text-center">
               {format(currentMonth, 'MMMM yyyy')}
             </span>
             <button
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              className="p-1 hover:bg-dark-700 rounded transition-colors"
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
             >
-              <ChevronRight size={18} className="text-gray-400" />
+              <ChevronRight size={18} className="text-slate-500 dark:text-gray-400" />
             </button>
           </div>
         </div>
@@ -961,23 +963,23 @@ export default function Dashboard() {
         <div className="mb-4 flex items-center flex-wrap gap-4 text-xs">
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-green-500/20 border border-green-500/50 rounded"></div>
-            <span className="text-gray-400">Available</span>
+            <span className="text-slate-500 dark:text-gray-400">Available</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-red-500/30 border border-red-500/50 rounded"></div>
-            <span className="text-gray-400">Reserved</span>
+            <span className="text-slate-500 dark:text-gray-400">Reserved</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-blue-500/30 border border-blue-500/50 rounded"></div>
-            <span className="text-gray-400">Check-in</span>
+            <span className="text-slate-500 dark:text-gray-400">Check-in</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-yellow-500/30 border border-yellow-500/50 rounded"></div>
-            <span className="text-gray-400">Check-out</span>
+            <span className="text-slate-500 dark:text-gray-400">Check-out</span>
           </div>
           <div className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-gray-700/20 border border-gray-700/50 rounded"></div>
-            <span className="text-gray-400">Past</span>
+            <span className="text-slate-500 dark:text-gray-400">Past</span>
           </div>
         </div>
 
@@ -989,24 +991,24 @@ export default function Dashboard() {
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
-              <Calendar className="text-white" size={20} />
-              <h2 className="text-lg font-semibold text-white">Booking Calendar</h2>
+              <Calendar className="text-slate-900 dark:text-white" size={20} />
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Booking Calendar</h2>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                className="p-1 hover:bg-dark-700 rounded transition-colors"
+                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
               >
-                <ChevronLeft size={18} className="text-gray-400" />
+                <ChevronLeft size={18} className="text-slate-500 dark:text-gray-400" />
               </button>
-              <span className="text-white font-medium text-sm min-w-[100px] text-center">
+              <span className="text-slate-900 dark:text-white font-medium text-sm min-w-[100px] text-center">
                 {format(currentMonth, 'MMM yyyy')}
               </span>
               <button
                 onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                className="p-1 hover:bg-dark-700 rounded transition-colors"
+                className="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors"
               >
-                <ChevronRight size={18} className="text-gray-400" />
+                <ChevronRight size={18} className="text-slate-500 dark:text-gray-400" />
               </button>
             </div>
           </div>
@@ -1014,15 +1016,15 @@ export default function Dashboard() {
           <div className="mb-3 flex items-center justify-center space-x-4 text-xs">
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-green-500/20 rounded"></div>
-              <span className="text-gray-400">Available</span>
+              <span className="text-slate-500 dark:text-gray-400">Available</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-orange-500/20 rounded"></div>
-              <span className="text-gray-400">Partial</span>
+              <span className="text-slate-500 dark:text-gray-400">Partial</span>
             </div>
             <div className="flex items-center space-x-1">
               <div className="w-3 h-3 bg-red-500/20 rounded"></div>
-              <span className="text-gray-400">Full</span>
+              <span className="text-slate-500 dark:text-gray-400">Full</span>
             </div>
           </div>
 
@@ -1030,46 +1032,46 @@ export default function Dashboard() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-4 pb-8">Revenue Last 7 Days</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 pb-8">Revenue Last 7 Days</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="date" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
+                  backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                  border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
                   borderRadius: '0.5rem',
-                  color: '#F3F4F6'
+                  color: isDarkMode ? '#F3F4F6' : '#0f172a'
                 }}
               />
-              <Bar dataKey="revenue" fill="#c19440" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="revenue" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-white mb-4 pb-8">Guest Arrivals</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 pb-8">Guest Arrivals</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <XAxis dataKey="date" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
+                  backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+                  border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
                   borderRadius: '0.5rem',
-                  color: '#F3F4F6'
+                  color: isDarkMode ? '#F3F4F6' : '#0f172a'
                 }}
               />
               <Line
                 type="monotone"
                 dataKey="guests"
-                stroke="#c19440"
+                stroke="#0ea5e9"
                 strokeWidth={2}
-                dot={{ fill: '#c19440', r: 4 }}
+                dot={{ fill: '#0ea5e9', r: 4 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -1080,16 +1082,19 @@ export default function Dashboard() {
         {statCards.map((stat, index) => (
           <div
             key={stat.title}
-            className="card p-6 hover:scale-105 transition-transform duration-200"
-            style={{ animationDelay: `${index * 100}ms` }}
+            className="card p-6 hover:scale-105 transition-all duration-200 border-l-4"
+            style={{ 
+              animationDelay: `${index * 100}ms`,
+              borderLeftColor: stat.color.split(' ')[1].replace('to-', '#').replace('-600', '') === '#primary' ? '#0ea5e9' : undefined 
+            }}
           >
             <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 rounded-lg ${stat.bgColor}`}>
-                <stat.icon className={stat.iconColor} size={24} />
+              <div className={`p-3 rounded-xl ${stat.bgColor.replace('500', '100').replace('10', '20')} dark:${stat.bgColor}`}>
+                <stat.icon className={stat.iconColor.replace('400', '600')} size={24} />
               </div>
             </div>
-            <h3 className="text-gray-400 text-sm font-medium">{stat.title}</h3>
-            <p className="text-xl font-bold text-white mt-2">{stat.value}</p>
+            <h3 className="text-slate-500 dark:text-gray-400 text-xs font-semibold uppercase tracking-wider">{stat.title}</h3>
+            <p className="text-2xl font-bold text-slate-900 dark:text-white mt-2">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -1097,27 +1102,27 @@ export default function Dashboard() {
       {/* Date Modal */}
       {showDateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-dark-800 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-bold text-white">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                   Bookings for {selectedDate && format(selectedDate, 'MMMM dd, yyyy')}
                 </h2>
-                <p className="text-gray-400 text-sm mt-1">
+                <p className="text-slate-500 dark:text-gray-400 text-sm mt-1">
                   {dateBookings.length} {dateBookings.length === 1 ? 'booking' : 'bookings'} on this date
                 </p>
               </div>
               <button
                 onClick={() => setShowDateModal(false)}
-                className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <X size={20} className="text-gray-400" />
+                <X size={20} className="text-slate-500 dark:text-gray-400" />
               </button>
             </div>
             
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
               {dateBookings.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
+                <div className="text-center py-12 text-slate-500">
                   No bookings on this date
                 </div>
               ) : (
@@ -1125,7 +1130,7 @@ export default function Dashboard() {
                   {dateBookings.map(booking => (
                     <div
                       key={booking.id}
-                      className="p-4 bg-dark-800 rounded-lg border border-dark-700 hover:bg-dark-700 transition-colors cursor-pointer"
+                      className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                       onClick={() => {
                         handleGuestClick(booking.id)
                         setShowDateModal(false)
@@ -1133,18 +1138,18 @@ export default function Dashboard() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="text-white font-semibold text-lg">
+                          <h3 className="text-slate-900 dark:text-white font-semibold text-lg">
                             {booking.name_with_initials}
                           </h3>
-                          <p className="text-sm text-gray-400">
-                            GRC: <span className="text-primary-400">{booking.grc_number}</span>
+                          <p className="text-sm text-slate-500 dark:text-gray-400">
+                            GRC: <span className="text-primary-600 dark:text-primary-400">{booking.grc_number}</span>
                           </p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                           booking.status === 'checked_in'
                             ? 'bg-green-500/10 text-green-400'
                             : booking.status === 'checked_out'
-                            ? 'bg-gray-500/10 text-gray-400'
+                            ? 'bg-gray-500/10 text-slate-500 dark:text-gray-400'
                             : booking.status === 'reserved'
                             ? 'bg-blue-500/10 text-blue-400'
                             : 'bg-red-500/10 text-red-400'
@@ -1155,30 +1160,30 @@ export default function Dashboard() {
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Room Number(s)</p>
-                          <p className="text-white font-medium">
+                          <p className="text-xs text-slate-500 dark:text-gray-500 mb-1">Room Number(s)</p>
+                          <p className="text-slate-900 dark:text-white font-medium">
                             {booking.room_numbers?.join(', ') || 'N/A'}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-500 mb-1">Duration</p>
-                          <p className="text-white font-medium">
+                          <p className="text-xs text-slate-500 dark:text-gray-500 mb-1">Duration</p>
+                          <p className="text-slate-900 dark:text-white font-medium">
                             {booking.number_of_nights} {booking.number_of_nights === 1 ? 'night' : 'nights'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-dark-700">
+                      <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                         <div className="flex items-center justify-between text-sm">
                           <div>
-                            <span className="text-gray-500">Check-in: </span>
-                            <span className="text-gray-300">
+                            <span className="text-slate-500 dark:text-gray-500">Check-in: </span>
+                            <span className="text-slate-700 dark:text-gray-300">
                               {format(new Date(booking.date_of_arrival), 'MMM dd, yyyy')}
                             </span>
                           </div>
                           <div>
-                            <span className="text-gray-500">Check-out: </span>
-                            <span className="text-gray-300">
+                            <span className="text-slate-500 dark:text-gray-500">Check-out: </span>
+                            <span className="text-slate-700 dark:text-gray-300">
                               {format(new Date(booking.date_of_departure), 'MMM dd, yyyy')}
                             </span>
                           </div>
@@ -1195,20 +1200,20 @@ export default function Dashboard() {
 
       <div className="card p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Recent Guests</h2>
-          <Link to="/guests" className="text-primary-400 hover:text-primary-300 text-sm font-medium">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white">Recent Guests</h2>
+          <Link to="/guests" className="text-primary-500 hover:text-primary-600 text-sm font-medium">
             View All →
           </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">GRC Number</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Guest Name</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Room</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Check-in</th>
-                <th className="text-left py-3 px-4 text-gray-400 font-medium text-sm">Status</th>
+              <tr className="border-b border-slate-200 dark:border-slate-800">
+                <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">GRC Number</th>
+                <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Guest Name</th>
+                <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Room</th>
+                <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Check-in</th>
+                <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -1222,25 +1227,25 @@ export default function Dashboard() {
                 recentGuests.map((guest) => (
                   <tr
                     key={guest.id}
-                    className="border-b border-dark-800 hover:bg-dark-800/50 transition-colors"
+                    className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <td className="py-4 px-4">
                       <Link to={`/guests/${guest.id}`} className="text-primary-400 hover:text-primary-300 font-medium">
                         {guest.grc_number}
                       </Link>
                     </td>
-                    <td className="py-4 px-4 text-gray-200">{guest.name_with_initials}</td>
-                    <td className="py-4 px-4 text-gray-300">{guest.room_numbers.join(', ')}</td>
-                    <td className="py-4 px-4 text-gray-300">
+                    <td className="py-4 px-4 text-slate-900 dark:text-gray-200">{guest.name_with_initials}</td>
+                    <td className="py-4 px-4 text-slate-600 dark:text-gray-300">{guest.room_numbers.join(', ')}</td>
+                    <td className="py-4 px-4 text-slate-600 dark:text-gray-300">
                       {format(new Date(guest.date_of_arrival), 'MMM dd, yyyy')}
                     </td>
                     <td className="py-4 px-4">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         guest.status === 'checked_in'
-                          ? 'bg-green-500/10 text-green-400'
+                          ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                           : guest.status === 'checked_out'
-                          ? 'bg-gray-500/10 text-gray-400'
-                          : 'bg-red-500/10 text-red-400'
+                          ? 'bg-slate-500/10 text-slate-500 dark:text-gray-400'
+                          : 'bg-red-500/10 text-red-600 dark:text-red-400'
                       }`}>
                         {guest.status.replace('_', ' ')}
                       </span>

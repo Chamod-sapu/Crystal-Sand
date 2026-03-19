@@ -522,7 +522,7 @@ export default function GuestDetails() {
   if (!guest) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-400">Guest not found</p>
+        <p className="text-slate-500 dark:text-gray-400">Guest not found</p>
       </div>
     )
   }
@@ -542,13 +542,13 @@ export default function GuestDetails() {
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
           >
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-white">{guest.grc_number}</h1>
-            <p className="text-gray-400 mt-1">{guest.name_with_initials}</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{guest.grc_number}</h1>
+            <p className="text-slate-500 dark:text-gray-400 mt-1">{guest.name_with_initials}</p>
           </div>
         </div>
         <div className="flex items-center space-x-3">
@@ -567,7 +567,7 @@ export default function GuestDetails() {
                 onClick={() => setShowExtendStay(true)}
                 className="btn-secondary flex items-center space-x-2"
               >
-                <CalendarPlus className="text-white" size={18} />
+                <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                 <span>Extend Stay</span>
               </button>
               <button
@@ -584,12 +584,12 @@ export default function GuestDetails() {
 
       {showExtendStay && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-dark-800">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <CalendarPlus className="text-white" size={24} />
-                  <h2 className="text-xl font-bold text-white">Extend Stay</h2>
+                  <CalendarPlus className="text-slate-900 dark:text-white" size={24} />
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">Extend Stay</h2>
                 </div>
                 <button
                   onClick={() => {
@@ -598,38 +598,38 @@ export default function GuestDetails() {
                     setExtendPreview(null)
                     setExtendError('')
                   }}
-                  className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={20} className="text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleExtendStay} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-              <div className="bg-dark-800 p-4 rounded-lg space-y-3">
-                <h3 className="text-white font-semibold mb-3">Current Booking</h3>
+              <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                <h3 className="text-slate-900 dark:text-white font-semibold mb-3">Current Booking</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-400">Check-in</p>
-                    <p className="text-white font-medium">
+                    <p className="text-slate-500 dark:text-gray-400">Check-in</p>
+                    <p className="text-slate-900 dark:text-white font-medium">
                       {format(new Date(guest.date_of_arrival), 'MMM dd, yyyy')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Current Check-out</p>
-                    <p className="text-white font-medium">
+                    <p className="text-slate-500 dark:text-gray-400">Current Check-out</p>
+                    <p className="text-slate-900 dark:text-white font-medium">
                       {format(new Date(guest.date_of_departure), 'MMM dd, yyyy')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Current Nights</p>
-                    <p className="text-white font-medium">
+                    <p className="text-slate-500 dark:text-gray-400">Current Nights</p>
+                    <p className="text-slate-900 dark:text-white font-medium">
                       {guest.number_of_nights || (guest.date_of_arrival === guest.date_of_departure ? 1 : 0)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Room(s)</p>
-                    <p className="text-white font-medium">{guest.room_numbers.join(', ')}</p>
+                    <p className="text-slate-500 dark:text-gray-400">Room(s)</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.room_numbers.join(', ')}</p>
                   </div>
                 </div>
               </div>
@@ -659,41 +659,41 @@ export default function GuestDetails() {
               {extendPreview && (
                 <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 space-y-3">
                   <h3 className="text-green-400 font-semibold flex items-center space-x-2">
-                    <CalendarPlus className="text-white" size={18} />
+                    <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                     <span>Extension Preview</span>
                   </h3>
                   
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">New Check-out Date</span>
-                      <span className="text-white font-medium">{extendPreview.newDeparture}</span>
+                      <span className="text-slate-500 dark:text-gray-400">New Check-out Date</span>
+                      <span className="text-slate-900 dark:text-white font-medium">{extendPreview.newDeparture}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Additional Nights</span>
-                      <span className="text-white font-medium">+{extendPreview.additionalNights}</span>
+                      <span className="text-slate-500 dark:text-gray-400">Additional Nights</span>
+                      <span className="text-slate-900 dark:text-white font-medium">+{extendPreview.additionalNights}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Total Nights</span>
-                      <span className="text-white font-medium">
+                      <span className="text-slate-500 dark:text-gray-400">Total Nights</span>
+                      <span className="text-slate-900 dark:text-white font-medium">
                         {extendPreview.currentNights} → {extendPreview.newNights}
                       </span>
                     </div>
                     
                     <div className="border-t border-green-500/20 pt-3 mt-3 space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Price per Night</span>
-                        <span className="text-white font-medium">
+                        <span className="text-slate-500 dark:text-gray-400">Price per Night</span>
+                        <span className="text-slate-900 dark:text-white font-medium">
                           {formatCurrency(extendPreview.pricePerNight)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Additional Charges</span>
+                        <span className="text-slate-500 dark:text-gray-400">Additional Charges</span>
                         <span className="text-green-400 font-medium">
                           +{formatCurrency(extendPreview.additionalCharge)}
                         </span>
                       </div>
                       <div className="flex justify-between text-base">
-                        <span className="text-white font-semibold">New Total Room Charge</span>
+                        <span className="text-slate-900 dark:text-white font-semibold">New Total Room Charge</span>
                         <span className="text-green-400 font-bold">
                           {formatCurrency(extendPreview.newTotalRoomCharge)}
                         </span>
@@ -706,7 +706,7 @@ export default function GuestDetails() {
                 </div>
               )}
 
-              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-dark-800">
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => {
@@ -732,7 +732,7 @@ export default function GuestDetails() {
                     </>
                   ) : (
                     <>
-                      <CalendarPlus className="text-white" size={18} />
+                      <CalendarPlus className="text-slate-900 dark:text-white" size={18} />
                       <span>Confirm Extension</span>
                     </>
                   )}
@@ -745,14 +745,14 @@ export default function GuestDetails() {
 
       {showDocumentPreview && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-dark-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-4 border-b border-dark-800 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-white">Document Preview</h2>
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Document Preview</h2>
               <button
                 onClick={() => setShowDocumentPreview(false)}
-                className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
               >
-                <X size={20} className="text-gray-400" />
+                <X size={20} className="text-slate-500 dark:text-gray-400" />
               </button>
             </div>
             {documentError ? (
@@ -776,21 +776,21 @@ export default function GuestDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div className="card p-6">
-            <h2 className="text-xl font-bold text-white mb-6">Guest Information</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Guest Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
                   <User className="text-primary-400 mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Full Name</p>
-                    <p className="text-white font-medium">{guest.name_with_initials}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Full Name</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.name_with_initials}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <CreditCard className="text-primary-400 mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Passport / NIC</p>
-                    <p className="text-white font-medium">{guest.passport_nic}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Passport / NIC</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.passport_nic}</p>
                     {documentUrl ? (
                       <button
                         onClick={() => setShowDocumentPreview(true)}
@@ -807,21 +807,21 @@ export default function GuestDetails() {
                 <div className="flex items-start space-x-3">
                   <MapPin className="text-primary-400 mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Nationality</p>
-                    <p className="text-white font-medium">{guest.nationality}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Nationality</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.nationality}</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Phone className="text-primary-400 mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Mobile Number</p>
-                    <p className="text-white font-medium">{guest.mobile_number}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Mobile Number</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.mobile_number}</p>
                   </div>
                 </div>
               </div>
               <div className="space-y-4">
                 <div>
-                  <p className="text-gray-400 text-sm">Room Numbers</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Numbers</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {guest.room_numbers.map(room => (
                       <span key={room} className="px-3 py-1 bg-primary-600 rounded-lg text-white font-medium">
@@ -831,38 +831,38 @@ export default function GuestDetails() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Room Type</p>
-                  <p className="text-white font-medium">{guest.room_type}</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Type</p>
+                  <p className="text-slate-900 dark:text-white font-medium">{guest.room_type}</p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Guests</p>
-                  <p className="text-white font-medium">
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Guests</p>
+                  <p className="text-slate-900 dark:text-white font-medium">
                     {guest.number_of_adults} Adults, {guest.number_of_children} Children
                   </p>
                 </div>
                 <div>
-                  <p className="text-gray-400 text-sm">Meal Plan</p>
-                  <p className="text-white font-medium">{guest.meal_plan || 'Not specified'}</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Meal Plan</p>
+                  <p className="text-slate-900 dark:text-white font-medium">{guest.meal_plan || 'Not specified'}</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-dark-800">
+            <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start space-x-3">
-                  <Calendar className="text-white mt-1" size={20} />
+                  <Calendar className="text-slate-900 dark:text-white mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Check-in</p>
-                    <p className="text-white font-medium">
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Check-in</p>
+                    <p className="text-slate-900 dark:text-white font-medium">
                       {format(new Date(guest.date_of_arrival), 'dd MMM yyyy')} at {guest.time_of_arrival}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
-                  <Calendar className="text-white mt-1" size={20} />
+                  <Calendar className="text-slate-900 dark:text-white mt-1" size={20} />
                   <div>
-                    <p className="text-gray-400 text-sm">Check-out</p>
-                    <p className="text-white font-medium">
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Check-out</p>
+                    <p className="text-slate-900 dark:text-white font-medium">
                       {format(new Date(guest.date_of_departure), 'dd MMM yyyy')} at {guest.time_of_departure}
                     </p>
                   </div>
@@ -871,7 +871,7 @@ export default function GuestDetails() {
             </div>
 
             {(guest.remarks || guest.advance_payment_amount > 0 || discountInfo) && (
-              <div className="mt-6 pt-6 border-t border-dark-800 space-y-4">
+              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-800 space-y-4">
                 {discountInfo && (
                   <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                     <p className="text-yellow-400 font-medium mb-3 flex items-center space-x-2">
@@ -880,27 +880,27 @@ export default function GuestDetails() {
                     </p>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Discount Type</span>
-                        <span className="text-white font-medium capitalize">
+                        <span className="text-slate-500 dark:text-gray-400">Discount Type</span>
+                        <span className="text-slate-900 dark:text-white font-medium capitalize">
                           {discountInfo.discountType === 'percentage' 
                             ? `${discountInfo.discountValue}% Off` 
                             : `Fixed Amount`}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Discount Amount</span>
+                        <span className="text-slate-500 dark:text-gray-400">Discount Amount</span>
                         <span className="text-yellow-400 font-medium">
                           -{formatCurrency(discountInfo.discountAmount)}
                         </span>
                       </div>
                       <div className="flex justify-between pt-2 border-t border-yellow-500/20">
-                        <span className="text-gray-400">Original Room Charge</span>
-                        <span className="text-white font-medium line-through">
+                        <span className="text-slate-500 dark:text-gray-400">Original Room Charge</span>
+                        <span className="text-slate-900 dark:text-white font-medium line-through">
                           {formatCurrency(discountInfo.originalRoomCharge)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-white font-semibold">Discounted Room Charge</span>
+                        <span className="text-slate-900 dark:text-white font-semibold">Discounted Room Charge</span>
                         <span className="text-yellow-400 font-bold">
                           {formatCurrency(discountInfo.discountedRoomCharge)}
                         </span>
@@ -910,8 +910,8 @@ export default function GuestDetails() {
                 )}
                 {guest.remarks && (
                   <div>
-                    <p className="text-gray-400 text-sm mb-2">Special Requests & Remarks</p>
-                    <p className="text-white bg-dark-800 p-3 rounded-lg">{guest.remarks}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm mb-2">Special Requests & Remarks</p>
+                    <p className="text-white bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">{guest.remarks}</p>
                   </div>
                 )}
                 {guest.advance_payment_amount > 0 && (
@@ -919,19 +919,19 @@ export default function GuestDetails() {
                     <p className="text-green-400 font-medium mb-3">Advance Payment Details</p>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Amount Paid</span>
-                        <span className="text-white font-medium">{formatCurrency(guest.advance_payment_amount)}</span>
+                        <span className="text-slate-500 dark:text-gray-400">Amount Paid</span>
+                        <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(guest.advance_payment_amount)}</span>
                       </div>
                       {guest.advance_payment_date && (
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Payment Date</span>
-                          <span className="text-white font-medium">{format(new Date(guest.advance_payment_date), 'dd MMM yyyy')}</span>
+                          <span className="text-slate-500 dark:text-gray-400">Payment Date</span>
+                          <span className="text-slate-900 dark:text-white font-medium">{format(new Date(guest.advance_payment_date), 'dd MMM yyyy')}</span>
                         </div>
                       )}
                       {guest.advance_payment_method && (
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Method</span>
-                          <span className="text-white font-medium capitalize">{guest.advance_payment_method}</span>
+                          <span className="text-slate-500 dark:text-gray-400">Method</span>
+                          <span className="text-slate-900 dark:text-white font-medium capitalize">{guest.advance_payment_method}</span>
                         </div>
                       )}
                     </div>
@@ -943,7 +943,7 @@ export default function GuestDetails() {
 
           <div className="card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white flex items-center space-x-2">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
                 <ShoppingCart size={24} />
                 <span>Additional Purchases</span>
               </h2>
@@ -959,7 +959,7 @@ export default function GuestDetails() {
             </div>
 
             {showAddPurchase && (
-              <form onSubmit={handleAddPurchase} className="mb-6 p-4 bg-dark-800 rounded-lg">
+              <form onSubmit={handleAddPurchase} className="mb-6 p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">Item Name</label>
@@ -1033,16 +1033,16 @@ export default function GuestDetails() {
                 purchases.map((purchase) => (
                   <div
                     key={purchase.id}
-                    className="flex items-center justify-between p-4 bg-dark-800 rounded-lg"
+                    className="flex items-center justify-between p-4 bg-slate-100 dark:bg-slate-800 rounded-lg"
                   >
                     <div className="flex-1">
                       <div className="flex items-center space-x-3">
-                        <h3 className="text-white font-medium">{purchase.item_name}</h3>
-                        <span className="px-2 py-1 bg-dark-700 rounded text-xs text-gray-400">
+                        <h3 className="text-slate-900 dark:text-white font-medium">{purchase.item_name}</h3>
+                        <span className="px-2 py-1 bg-slate-700 rounded text-xs text-slate-500 dark:text-gray-400">
                           {purchase.category}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
                         {purchase.quantity} × {formatCurrency(purchase.unit_price)} = {formatCurrency(purchase.total_price)}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
@@ -1052,7 +1052,7 @@ export default function GuestDetails() {
                     {guest.status === 'checked_in' && (
                       <button
                         onClick={() => handleDeletePurchase(purchase.id)}
-                        className="p-2 hover:bg-dark-700 rounded-lg text-red-400 transition-colors"
+                        className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -1067,14 +1067,14 @@ export default function GuestDetails() {
         <div className="space-y-6">
           <div className="card p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Billing Summary</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white">Billing Summary</h2>
               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                 guest.status === 'reserved'
                   ? 'bg-blue-500/10 text-blue-400'
                   : guest.status === 'checked_in'
                   ? 'bg-green-500/10 text-green-400'
                   : guest.status === 'checked_out'
-                  ? 'bg-gray-500/10 text-gray-400'
+                  ? 'bg-gray-500/10 text-slate-500 dark:text-gray-400'
                   : 'bg-red-500/10 text-red-400'
               }`}>
                 {guest.status === 'reserved' ? 'Reserved' : guest.status.replace('_', ' ')}
@@ -1085,13 +1085,13 @@ export default function GuestDetails() {
               <div className="space-y-4">
                 {discountInfo ? (
                   <>
-                    <div className="flex justify-between py-2 border-b border-dark-800">
-                      <span className="text-gray-400">Room Charges (Original)</span>
-                      <span className="text-white font-medium line-through">
+                    <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-gray-400">Room Charges (Original)</span>
+                      <span className="text-slate-900 dark:text-white font-medium line-through">
                         {formatCurrency(discountInfo.originalRoomCharge)}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-dark-800">
+                    <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
                       <span className="text-yellow-400 flex items-center space-x-1">
                         <Tag size={16} />
                         <span>
@@ -1104,62 +1104,62 @@ export default function GuestDetails() {
                         -{formatCurrency(discountInfo.discountAmount)}
                       </span>
                     </div>
-                    <div className="flex justify-between py-2 border-b border-dark-800">
-                      <span className="text-gray-400">Room Charges (After Discount)</span>
-                      <span className="text-white font-medium">
+                    <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-gray-400">Room Charges (After Discount)</span>
+                      <span className="text-slate-900 dark:text-white font-medium">
                         {formatCurrency(discountInfo.discountedRoomCharge)}
                       </span>
                     </div>
                   </>
                 ) : (
-                  <div className="flex justify-between py-2 border-b border-dark-800">
-                    <span className="text-gray-400">Room Charges</span>
-                    <span className="text-white font-medium">{formatCurrency(bill.roomCharges)}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400">Room Charges</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.roomCharges)}</span>
                   </div>
                 )}
                 {bill.restaurantPurchasesTotal > 0 && (
-                  <div className="flex justify-between py-2 border-b border-dark-800">
-                    <span className="text-gray-400">Restaurant Purchases</span>
-                    <span className="text-white font-medium">{formatCurrency(bill.restaurantPurchasesTotal)}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400">Restaurant Purchases</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.restaurantPurchasesTotal)}</span>
                   </div>
                 )}
                 {bill.otherPurchasesTotal > 0 && (
-                  <div className="flex justify-between py-2 border-b border-dark-800">
-                    <span className="text-gray-400">Other Purchases</span>
-                    <span className="text-white font-medium">{formatCurrency(bill.otherPurchasesTotal)}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400">Other Purchases</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.otherPurchasesTotal)}</span>
                   </div>
                 )}
                 {bill.purchasesTotal === 0 && (
-                  <div className="flex justify-between py-2 border-b border-dark-800">
-                    <span className="text-gray-400">Additional Purchases</span>
-                    <span className="text-white font-medium">{formatCurrency(0)}</span>
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400">Additional Purchases</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(0)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-2 border-b border-dark-800">
-                  <span className="text-gray-400">Subtotal</span>
-                  <span className="text-white font-medium">{formatCurrency(bill.subtotal)}</span>
+                <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                  <span className="text-slate-500 dark:text-gray-400">Subtotal</span>
+                  <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.subtotal)}</span>
                 </div>
                 {bill.tax > 0 && (
-                  <div className="flex justify-between py-2 border-b border-dark-800">
-                    <span className="text-gray-400 flex flex-col">
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400 flex flex-col">
                       <span>Tax ({settings?.tax_percentage}%)</span>
                       <span className="text-xs text-gray-500">Applied to restaurant items only</span>
                     </span>
-                    <span className="text-white font-medium">{formatCurrency(bill.tax)}</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.tax)}</span>
                   </div>
                 )}
                 <div className="flex justify-between py-3 bg-primary-600/10 rounded-lg px-3">
-                  <span className="text-white font-bold text-lg">Grand Total</span>
+                  <span className="text-slate-900 dark:text-white font-bold text-lg">Grand Total</span>
                   <span className="text-primary-400 font-bold text-lg">{formatCurrency(bill.grandTotal)}</span>
                 </div>
                 {bill.advancePayment > 0 && (
                   <>
-                    <div className="flex justify-between py-2 border-b border-dark-800">
-                      <span className="text-gray-400">Advance Payment</span>
+                    <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-slate-500 dark:text-gray-400">Advance Payment</span>
                       <span className="text-green-400 font-medium">-{formatCurrency(bill.advancePayment)}</span>
                     </div>
                     <div className="flex justify-between py-3 bg-green-500/10 rounded-lg px-3">
-                      <span className="text-white font-bold text-lg">Balance Due</span>
+                      <span className="text-slate-900 dark:text-white font-bold text-lg">Balance Due</span>
                       <span className="text-green-400 font-bold text-lg">{formatCurrency(bill.balanceDue)}</span>
                     </div>
                   </>
@@ -1178,16 +1178,16 @@ export default function GuestDetails() {
 
           {guest.reservation_number && (
             <div className="card p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Reservation Info</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Reservation Info</h3>
               <div className="space-y-3">
                 <div>
-                  <p className="text-gray-400 text-sm">Reservation Number</p>
-                  <p className="text-white font-medium">{guest.reservation_number}</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Reservation Number</p>
+                  <p className="text-slate-900 dark:text-white font-medium">{guest.reservation_number}</p>
                 </div>
                 {guest.voucher_number && (
                   <div>
-                    <p className="text-gray-400 text-sm">Voucher Number</p>
-                    <p className="text-white font-medium">{guest.voucher_number}</p>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Voucher Number</p>
+                    <p className="text-slate-900 dark:text-white font-medium">{guest.voucher_number}</p>
                   </div>
                 )}
               </div>
