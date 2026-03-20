@@ -495,9 +495,13 @@ export default function Rooms() {
   }
 
   const getGuestForRoom = (roomNumber) => {
+    const today = format(new Date(), 'yyyy-MM-dd')
     return guests.find(g => 
       g.room_numbers?.includes(roomNumber) && 
-      ['checked_in', 'reserved'].includes(g.status)
+      (
+        g.status === 'checked_in' || 
+        (g.status === 'reserved' && g.date_of_arrival <= today && g.date_of_departure >= today)
+      )
     ) || null
   }
 
@@ -506,6 +510,7 @@ export default function Rooms() {
     if (guest) {
       return guest.status === 'checked_in' ? 'occupied' : 'reserved'
     }
+    // If room is marked as occupied/maintenance in DB but no active guest found, respect the DB status
     return room.status || 'available'
   }
 

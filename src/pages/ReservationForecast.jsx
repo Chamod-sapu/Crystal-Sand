@@ -9,8 +9,10 @@ import { formatCurrency } from '../utils/calculations'
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday } from 'date-fns'
 import { Calendar, TrendingUp, Users, DollarSign, X, ChevronLeft, ChevronRight, Download, FileDown } from 'lucide-react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { useTheme } from '../context/ThemeContext'
 
 export default function ReservationForecast() {
+  const { isDarkMode } = useTheme()
   const [guests, setGuests] = useState([])
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
@@ -859,15 +861,15 @@ export default function ReservationForecast() {
           {forecastData.occupancyTrend.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={forecastData.occupancyTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" stroke="#9CA3AF" />
-                <YAxis stroke="#9CA3AF" domain={[0, 100]} />
+                <CartesianGrid strokeDasharray="3 10" stroke={isDarkMode ? '#374151' : '#e2e8f0'} vertical={false} />
+                <XAxis dataKey="date" stroke={isDarkMode ? '#9CA3AF' : '#64748b'} />
+                <YAxis stroke={isDarkMode ? '#9CA3AF' : '#64748b'} domain={[0, 100]} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1F2937',
-                    border: '1px solid #374151',
+                    backgroundColor: isDarkMode ? '#1F2937' : '#ffffff',
+                    border: isDarkMode ? '1px solid #374151' : '1px solid #e2e8f0',
                     borderRadius: '0.5rem',
-                    color: '#F3F4F6'
+                    color: isDarkMode ? '#F3F4F6' : '#1e293b'
                   }}
                   formatter={(value) => `${value}%`}
                 />
@@ -875,8 +877,8 @@ export default function ReservationForecast() {
                   type="monotone"
                   dataKey="occupancy"
                   stroke="#c19440"
-                  strokeWidth={2}
-                  dot={{ fill: '#c19440', r: 4 }}
+                  strokeWidth={1.5}
+                  dot={{ fill: '#c19440', r: 3 }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -929,19 +931,19 @@ export default function ReservationForecast() {
         {forecastData.dailyOccupancy.length > 0 ? (
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={forecastData.dailyOccupancy}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="date" stroke="#9CA3AF" />
-              <YAxis stroke="#9CA3AF" />
+              <CartesianGrid strokeDasharray="3 10" stroke={isDarkMode ? '#374151' : '#e2e8f0'} vertical={false} />
+              <XAxis dataKey="date" stroke={isDarkMode ? '#9CA3AF' : '#64748b'} />
+              <YAxis stroke={isDarkMode ? '#9CA3AF' : '#64748b'} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#1F2937',
-                  border: '1px solid #374151',
+                  backgroundColor: isDarkMode ? '#1F2937' : '#ffffff',
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #e2e8f0',
                   borderRadius: '0.5rem',
-                  color: '#F3F4F6'
+                  color: isDarkMode ? '#F3F4F6' : '#1e293b'
                 }}
                 formatter={(value) => [`${value}%`, 'Occupancy']}
               />
-              <Bar dataKey="occupancy" fill="#c19440" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="occupancy" fill="#c19440" radius={[4, 4, 0, 0]} barSize={32} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
