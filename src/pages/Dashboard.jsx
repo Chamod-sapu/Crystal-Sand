@@ -229,18 +229,17 @@ export default function Dashboard() {
       setAllGuests(guests || [])
       setAllRooms(rooms || [])
 
-      const todayGuests = guests?.filter(g =>
-        format(new Date(g.created_at), 'yyyy-MM-dd') === today
-      ).length || 0
+      const currentlyInHouse = guests?.filter(g => g.status === 'checked_in').length || 0
+      const arrivingToday = guests?.filter(g => g.status === 'reserved' && g.date_of_arrival === today).length || 0
 
       const monthGuests = guests?.filter(g => {
-        const createdDate = format(new Date(g.created_at), 'yyyy-MM-dd')
-        return createdDate >= monthStart && createdDate <= monthEnd
+        const arrivalDate = g.date_of_arrival
+        return arrivalDate >= monthStart && arrivalDate <= monthEnd
       }).length || 0
 
-      const totalRevenue = guests?.reduce((sum, g) => {
-        return sum + parseFloat(g.total_room_charge || 0)
-      }, 0) || 0
+      // Only count revenue from completed stays or active stays (not future reservations)
+      const roomRevenue = guests?.filter(g => ['checked_in', 'checked_out'].includes(g.status))
+        .reduce((sum, g) => sum + parseFloat(g.total_room_charge || 0), 0) || 0
 
       const { data: purchases } = await supabase
         .from('purchases')
@@ -264,15 +263,17 @@ export default function Dashboard() {
 
       const upcomingReservations = guests?.filter(g => {
         const checkInDate = new Date(g.date_of_arrival)
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
         const thirtyDaysFromNow = new Date()
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30)
-        return g.status !== 'cancelled' && checkInDate >= new Date() && checkInDate <= thirtyDaysFromNow
+        return g.status === 'reserved' && checkInDate >= todayStart && checkInDate <= thirtyDaysFromNow
       }).length || 0
 
       setStats({
-        todayGuests,
+        todayGuests: currentlyInHouse + arrivingToday,
         monthGuests,
-        totalRevenue: totalRevenue + purchasesRevenue,
+        totalRevenue: roomRevenue + purchasesRevenue,
         pendingCheckouts,
         availableRooms,
         totalRooms,
@@ -393,7 +394,7 @@ export default function Dashboard() {
                 onClick={() => handleDateClick(day)}
                 className={`
                   p-1 rounded text-xs font-medium transition-all hover:scale-105 flex items-center justify-center
-                  ${!isCurrentMonth ? 'text-gray-600' : 'text-gray-200'}
+                  ${!isCurrentMonth ? 'text-slate-400 dark:text-gray-600' : 'text-slate-900 dark:text-gray-200'}
                   ${isCurrentDay ? 'ring-1 ring-primary-400' : ''}
                   ${status === 'available' ? 'bg-green-500/20 hover:bg-green-500/30' : ''}
                   ${status === 'partially-booked' ? 'bg-orange-500/20 hover:bg-orange-500/30' : ''}
@@ -461,8 +462,8 @@ export default function Dashboard() {
                 const isTodayDate = isToday(day)
                 return (
                   <th key={index} className={`border border-slate-200 dark:border-slate-700 p-0.5 sm:p-1 ${isPast ? 'bg-gray-700/30' : ''} ${isTodayDate ? 'bg-primary-600/20 ring-1 ring-primary-500' : ''}`}>
-                    <div className={`${isPast ? 'text-gray-600' : 'text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
-                    <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-gray-700' : 'text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
+                    <div className={`${isPast ? 'text-slate-400 dark:text-gray-600' : 'text-slate-900 dark:text-gray-300'} text-[8px] sm:text-xs`}>{format(day, 'd')}</div>
+                    <div className={`text-[6px] sm:text-[10px] ${isPast ? 'text-slate-400 dark:text-gray-600' : 'text-slate-500 dark:text-gray-500'} hidden sm:block`}>{format(day, 'EEE')}</div>
                   </th>
                 )
               })}
@@ -561,7 +562,7 @@ export default function Dashboard() {
       icon: Calendar,
       color: 'from-orange-500 to-orange-600',
       bgColor: 'bg-orange-500/10',
-      iconColor: 'text-white'
+      iconColor: 'text-orange-400'
     },
     {
       title: 'Pending Checkouts',
@@ -823,10 +824,10 @@ export default function Dashboard() {
                             </span>
                           </div>
                           <div className="text-sm text-slate-500 dark:text-gray-400">
-                            Type: <span className="text-gray-300">{room.room_type}</span>
+                            Type: <span className="text-slate-900 dark:text-gray-300">{room.room_type}</span>
                           </div>
                           <div className="text-sm text-slate-500 dark:text-gray-400">
-                            Floor: <span className="text-gray-300">{room.floor || 1}</span>
+                            Floor: <span className="text-slate-900 dark:text-gray-300">{room.floor || 1}</span>
                           </div>
                           <div className="text-sm text-primary-400 font-medium mt-2">
                             {formatCurrency(room.base_price)}
@@ -859,7 +860,7 @@ export default function Dashboard() {
                                 GRC: <span className="text-primary-400">{reservation.grc_number}</span>
                               </div>
                               <div className="text-sm text-slate-500 dark:text-gray-400">
-                                Rooms: <span className="text-gray-300">{reservation.room_numbers.join(', ')}</span>
+                                Rooms: <span className="text-slate-900 dark:text-gray-300">{reservation.room_numbers.join(', ')}</span>
                               </div>
                               <div className="text-sm text-slate-500 dark:text-gray-400">
                                 {format(new Date(reservation.date_of_arrival), 'MMM dd')} - {format(new Date(reservation.date_of_departure), 'MMM dd, yyyy')}
@@ -903,7 +904,7 @@ export default function Dashboard() {
                                 GRC: <span className="text-primary-400">{guest.grc_number}</span>
                               </div>
                               <div className="text-sm text-slate-500 dark:text-gray-400">
-                                Rooms: <span className="text-gray-300">{guest.room_numbers.join(', ')}</span>
+                                Rooms: <span className="text-slate-900 dark:text-gray-300">{guest.room_numbers.join(', ')}</span>
                               </div>
                               <div className="text-sm text-slate-500 dark:text-gray-400">
                                 {format(new Date(guest.date_of_arrival), 'MMM dd')} - {format(new Date(guest.date_of_departure), 'MMM dd, yyyy')}
@@ -1035,9 +1036,9 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 pb-8">Revenue Last 7 Days</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="date" stroke="#94a3b8" />
-              <YAxis stroke="#94a3b8" />
+              <CartesianGrid strokeDasharray="3 10" stroke={isDarkMode ? '#334155' : '#e2e8f0'} vertical={false} />
+              <XAxis dataKey="date" stroke={isDarkMode ? '#94a3b8' : '#64748b'} />
+              <YAxis stroke={isDarkMode ? '#94a3b8' : '#64748b'} />
               <Tooltip
                 contentStyle={{
                   backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
@@ -1046,7 +1047,7 @@ export default function Dashboard() {
                   color: isDarkMode ? '#F3F4F6' : '#0f172a'
                 }}
               />
-              <Bar dataKey="revenue" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+               <Bar dataKey="revenue" fill={isDarkMode ? '#0ea5e9' : '#0284c7'} radius={[4, 4, 0, 0]} barSize={32} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -1055,7 +1056,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 pb-8">Guest Arrivals</h2>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+              <CartesianGrid strokeDasharray="3 10" stroke={isDarkMode ? '#334155' : '#e2e8f0'} vertical={false} />
               <XAxis dataKey="date" stroke="#94a3b8" />
               <YAxis stroke="#94a3b8" />
               <Tooltip
@@ -1070,8 +1071,8 @@ export default function Dashboard() {
                 type="monotone"
                 dataKey="guests"
                 stroke="#0ea5e9"
-                strokeWidth={2}
-                dot={{ fill: '#0ea5e9', r: 4 }}
+                strokeWidth={1.5}
+                dot={{ fill: '#0ea5e9', r: 3 }}
               />
             </LineChart>
           </ResponsiveContainer>
