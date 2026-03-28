@@ -150,8 +150,8 @@ export default function NewGuest() {
     
     if (!file) return
 
-    if (file.type !== 'application/pdf') {
-      setError('Please upload a PDF file only')
+    if (file.type !== 'application/pdf' && file.type !== 'image/jpeg' && file.type !== 'image/jpg') {
+      setError('Please upload a PDF or JPG file only')
       event.target.value = ''
       return
     }
@@ -291,99 +291,13 @@ export default function NewGuest() {
       if (!guest.room_numbers?.includes(roomNumber)) return false
       if (guest.status === 'cancelled') return false
 
-      const guestArrivalDate = new Date(guest.date_of_arrival)
-      const guestDepartureDate = new Date(guest.date_of_departure)
-      const newArrivalDate = new Date(arrivalDate)
-      const newDepartureDate = new Date(departureDate)
+      const newArr = new Date(`${arrivalDate}T${arrivalTime || '14:00'}`)
+      const newDep = new Date(`${departureDate}T${departureTime || '12:00'}`)
+      const guestArr = new Date(`${guest.date_of_arrival}T${guest.time_of_arrival || '14:00'}`)
+      const guestDep = new Date(`${guest.date_of_departure}T${guest.time_of_departure || '12:00'}`)
 
-      const datesOverlap = !(newDepartureDate < guestArrivalDate || newArrivalDate > guestDepartureDate)
-      
-      if (!datesOverlap) return false
-
-      const isSameDayBooking = arrivalDate === departureDate
-      const isGuestSameDayBooking = guest.date_of_arrival === guest.date_of_departure
-
-      // For same-day bookings, we need to check time conflicts
-      if (isSameDayBooking && isGuestSameDayBooking && arrivalDate === guest.date_of_arrival) {
-        // Both bookings are on the same day, check time overlap
-        const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
-        const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
-        const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
-        const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
-
-        const newArrMinutes = newArrHour * 60 + newArrMin
-        const newDepMinutes = newDepHour * 60 + newDepMin
-        const guestArrMinutes = guestArrHour * 60 + guestArrMin
-        const guestDepMinutes = guestDepHour * 60 + guestDepMin
-
-        // Check if time slots overlap
-        // No conflict if: new booking ends before or when existing starts, OR new booking starts at or after existing ends
-        const timeConflict = !(newDepMinutes <= guestArrMinutes || newArrMinutes >= guestDepMinutes)
-        return timeConflict
-      }
-
-      // If one is same-day and the other is not, check if they overlap on dates
-      if (isSameDayBooking && !isGuestSameDayBooking) {
-        // New booking is same-day, existing booking spans multiple days
-        // Check if the same-day booking falls within the existing booking period
-        if (arrivalDate >= guest.date_of_arrival && arrivalDate <= guest.date_of_departure) {
-          // The same-day booking is within the multi-day booking period
-          // Check if it's on the arrival day or departure day of the multi-day booking
-          if (arrivalDate === guest.date_of_arrival) {
-            // Same-day booking is on the arrival day of multi-day booking
-            const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
-            const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
-            const newArrMinutes = newArrHour * 60 + newArrMin
-            const guestArrMinutes = guestArrHour * 60 + guestArrMin
-            // Conflict if same-day booking starts at or after the multi-day booking arrival time
-            return newArrMinutes >= guestArrMinutes
-          } else if (arrivalDate === guest.date_of_departure) {
-            // Same-day booking is on the departure day of multi-day booking
-            const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
-            const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
-            const newDepMinutes = newDepHour * 60 + newDepMin
-            const guestDepMinutes = guestDepHour * 60 + guestDepMin
-            // Conflict if same-day booking ends after the multi-day booking departure time
-            return newDepMinutes > guestDepMinutes
-          } else {
-            // Same-day booking is in the middle of multi-day booking period
-            return true
-          }
-        }
-        return false
-      }
-
-      if (!isSameDayBooking && isGuestSameDayBooking) {
-        // Existing booking is same-day, new booking spans multiple days
-        // Check if the same-day existing booking falls within the new booking period
-        if (guest.date_of_arrival >= arrivalDate && guest.date_of_arrival <= departureDate) {
-          // The same-day existing booking is within the multi-day new booking period
-          if (guest.date_of_arrival === arrivalDate) {
-            // Same-day existing booking is on the arrival day of new multi-day booking
-            const [newArrHour, newArrMin] = arrivalTime.split(':').map(Number)
-            const [guestDepHour, guestDepMin] = guest.time_of_departure.split(':').map(Number)
-            const newArrMinutes = newArrHour * 60 + newArrMin
-            const guestDepMinutes = guestDepHour * 60 + guestDepMin
-            // Conflict if new booking starts before existing same-day booking ends
-            return newArrMinutes < guestDepMinutes
-          } else if (guest.date_of_arrival === departureDate) {
-            // Same-day existing booking is on the departure day of new multi-day booking
-            const [newDepHour, newDepMin] = departureTime.split(':').map(Number)
-            const [guestArrHour, guestArrMin] = guest.time_of_arrival.split(':').map(Number)
-            const newDepMinutes = newDepHour * 60 + newDepMin
-            const guestArrMinutes = guestArrHour * 60 + guestArrMin
-            // Conflict if new booking ends after existing same-day booking starts
-            return newDepMinutes > guestArrMinutes
-          } else {
-            // Same-day existing booking is in the middle of new multi-day booking period
-            return true
-          }
-        }
-        return false
-      }
-
-      // Both are multi-day bookings, they conflict if dates overlap
-      return datesOverlap
+      // Precise time overlap calculation
+      return newArr < guestDep && newDep > guestArr
     })
 
     return conflictingGuests
@@ -534,7 +448,8 @@ export default function NewGuest() {
 
         try {
           const timestamp = Date.now()
-          const fileName = `${grcNumber}_${timestamp}.pdf`
+          const fileExtension = uploadedFile.file.name.split('.').pop()
+          const fileName = `${grcNumber}_${timestamp}.${fileExtension}`
           const filePath = `documents/${fileName}`
 
           const { data, error: uploadError } = await supabase.storage
@@ -932,7 +847,7 @@ export default function NewGuest() {
           </div>
 
           <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-            <label className="label mb-3">Passport / NIC Document (PDF)</label>
+            <label className="label mb-3">Passport / NIC Document (PDF/JPG)</label>
             
             {!uploadedFile ? (
               <div>
@@ -956,7 +871,7 @@ export default function NewGuest() {
                         <p className="mb-2 text-sm text-slate-500 dark:text-gray-400">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
-                <p className="text-xs text-gray-500">PDF only (MAX. 2.5MB)</p>
+                <p className="text-xs text-gray-500">PDF/JPG only (MAX. 2.5MB)</p>
                       </>
                     )}
                   </div>
@@ -964,7 +879,7 @@ export default function NewGuest() {
                     id="passport-upload"
                     type="file"
                     className="hidden"
-                    accept="application/pdf"
+                    accept="application/pdf,image/jpeg,image/jpg"
                     onChange={handleFileUpload}
                     disabled={isUploading || loading}
                   />

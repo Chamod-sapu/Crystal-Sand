@@ -13,17 +13,16 @@ export function checkRoomAvailability(room, guests, checkInDate, checkOutDate) {
     if (guest.status === 'cancelled') return false
     if (!guest.room_numbers || !Array.isArray(guest.room_numbers)) return false
     
-    const guestCheckIn = new Date(guest.date_of_arrival)
-    const guestCheckOut = new Date(guest.date_of_departure)
+    const guestCheckIn = new Date(`${guest.date_of_arrival}T${guest.time_of_arrival || '14:00'}`)
+    const guestCheckOut = new Date(`${guest.date_of_departure}T${guest.time_of_departure || '12:00'}`)
+    const newCheckIn = new Date(`${checkInDate}T14:00`)
+    const newCheckOut = new Date(`${checkOutDate}T12:00`)
 
     const occupiesRoom = guest.room_numbers.includes(room.room_number)
     if (!occupiesRoom) return false
 
-    // Check for date overlap (excluding same-day turnover)
-    const hasOverlap = !(
-      (isBefore(checkIn, guestCheckOut) && isBefore(checkOut, guestCheckIn)) || // No overlap
-      (isAfter(checkIn, guestCheckOut) || isEqual(checkIn, guestCheckOut)) // New check-in after guest check-out
-    )
+    // Check for date overlap (excluding same-day turnover by incorporating times)
+    const hasOverlap = newCheckIn < guestCheckOut && newCheckOut > guestCheckIn
     
     return hasOverlap
   })

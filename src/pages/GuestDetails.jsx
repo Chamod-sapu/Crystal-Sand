@@ -133,14 +133,13 @@ export default function GuestDetails() {
         const conflicts = allGuests?.filter(g => {
           if (!g.room_numbers?.includes(roomNumber)) return false
           
-          const guestArrival = new Date(g.date_of_arrival)
-          const guestDeparture = new Date(g.date_of_departure)
+          const newArr = new Date(`${guest.date_of_departure}T${guest.time_of_departure || '12:00'}`)
+          const newDep = new Date(`${newDepartureDate}T12:00`)
           
-          return (
-            (guestArrival > currentDeparture && guestArrival < newDeparture) ||
-            (guestDeparture > currentDeparture && guestDeparture <= newDeparture) ||
-            (guestArrival <= currentDeparture && guestDeparture >= newDeparture)
-          )
+          const guestArr = new Date(`${g.date_of_arrival}T${g.time_of_arrival || '14:00'}`)
+          const guestDep = new Date(`${g.date_of_departure}T${g.time_of_departure || '12:00'}`)
+          
+          return newArr < guestDep && newDep > guestArr
         })
 
         if (conflicts && conflicts.length > 0) {
