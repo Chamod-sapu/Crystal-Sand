@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import { formatCurrency } from '../utils/calculations'
 import {
   Coffee,
@@ -21,6 +22,7 @@ import {
 import { format } from 'date-fns'
 
 export default function FoodBeverage() {
+  const { canManageFBItems } = useAuth()
   const [rooms, setRooms] = useState([])
   const [tables, setTables] = useState([])
   const [guests, setGuests] = useState([])
@@ -899,13 +901,15 @@ export default function FoodBeverage() {
           </h1>
           <p className="text-slate-500 dark:text-gray-400 mt-1">Manage Food and Beverage</p>
         </div>
-        <button
-          onClick={() => setShowManageRestaurantItems(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Utensils size={20} />
-          <span>Manage Restaurant Items</span>
-        </button>
+        {canManageFBItems() && (
+          <button
+            onClick={() => setShowManageRestaurantItems(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Utensils size={20} />
+            <span>Manage Restaurant Items</span>
+          </button>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -1620,93 +1624,95 @@ export default function FoodBeverage() {
 
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
               {/* Add/Edit Item Form */}
-              <form onSubmit={handleSaveRestaurantItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                <h3 className="text-slate-900 dark:text-white font-semibold mb-4">
-                  {editingRestaurantItem ? 'Edit Item' : 'Add New Item'}
-                </h3>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Item Name *</label>
-                    <input
-                      type="text"
-                      value={newRestaurantItem.item_name}
-                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, item_name: e.target.value })}
-                      className="input-field"
-                      placeholder="e.g., Chicken Fried Rice"
-                      required
-                    />
+              {canManageFBItems() && (
+                <form onSubmit={handleSaveRestaurantItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                  <h3 className="text-slate-900 dark:text-white font-semibold mb-4">
+                    {editingRestaurantItem ? 'Edit Item' : 'Add New Item'}
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Item Name *</label>
+                      <input
+                        type="text"
+                        value={newRestaurantItem.item_name}
+                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, item_name: e.target.value })}
+                        className="input-field"
+                        placeholder="e.g., Chicken Fried Rice"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">Category *</label>
+                      <select
+                        value={newRestaurantItem.category}
+                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, category: e.target.value })}
+                        className="input-field"
+                        required
+                      >
+                        <option value="main_course">Main Course</option>
+                        <option value="appetizer">Appetizer</option>
+                        <option value="dessert">Dessert</option>
+                        <option value="beverage">Beverage</option>
+                        <option value="special">Special</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="label">Unit Price (LKR) *</label>
+                      <input
+                        type="number"
+                        value={newRestaurantItem.unit_price}
+                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, unit_price: parseFloat(e.target.value) || 0 })}
+                        className="input-field"
+                        min="0"
+                        step="0.01"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">Availability</label>
+                      <select
+                        value={newRestaurantItem.is_available ? 'true' : 'false'}
+                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, is_available: e.target.value === 'true' })}
+                        className="input-field"
+                      >
+                        <option value="true">Available</option>
+                        <option value="false">Not Available</option>
+                      </select>
+                    </div>
+
+                    <div className="col-span-2">
+                      <label className="label">Description</label>
+                      <textarea
+                        value={newRestaurantItem.description}
+                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, description: e.target.value })}
+                        className="input-field"
+                        rows="2"
+                        placeholder="Brief description of the item..."
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="label">Category *</label>
-                    <select
-                      value={newRestaurantItem.category}
-                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, category: e.target.value })}
-                      className="input-field"
-                      required
-                    >
-                      <option value="main_course">Main Course</option>
-                      <option value="appetizer">Appetizer</option>
-                      <option value="dessert">Dessert</option>
-                      <option value="beverage">Beverage</option>
-                      <option value="special">Special</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="label">Unit Price (LKR) *</label>
-                    <input
-                      type="number"
-                      value={newRestaurantItem.unit_price}
-                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, unit_price: parseFloat(e.target.value) || 0 })}
-                      className="input-field"
-                      min="0"
-                      step="0.01"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">Availability</label>
-                    <select
-                      value={newRestaurantItem.is_available ? 'true' : 'false'}
-                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, is_available: e.target.value === 'true' })}
-                      className="input-field"
-                    >
-                      <option value="true">Available</option>
-                      <option value="false">Not Available</option>
-                    </select>
-                  </div>
-
-                  <div className="col-span-2">
-                    <label className="label">Description</label>
-                    <textarea
-                      value={newRestaurantItem.description}
-                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, description: e.target.value })}
-                      className="input-field"
-                      rows="2"
-                      placeholder="Brief description of the item..."
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end space-x-3 mt-4">
-                  {editingRestaurantItem && (
-                    <button
-                      type="button"
-                      onClick={resetNewRestaurantItem}
-                      className="btn-secondary"
-                    >
-                      Cancel Edit
+                  <div className="flex items-center justify-end space-x-3 mt-4">
+                    {editingRestaurantItem && (
+                      <button
+                        type="button"
+                        onClick={resetNewRestaurantItem}
+                        className="btn-secondary"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                    <button type="submit" className="btn-primary flex items-center space-x-2">
+                      <Save size={18} />
+                      <span>{editingRestaurantItem ? 'Update Item' : 'Add Item'}</span>
                     </button>
-                  )}
-                  <button type="submit" className="btn-primary flex items-center space-x-2">
-                    <Save size={18} />
-                    <span>{editingRestaurantItem ? 'Update Item' : 'Add Item'}</span>
-                  </button>
-                </div>
-              </form>
+                  </div>
+                </form>
+              )}
 
               {/* Items Table */}
               <div className="overflow-x-auto">
@@ -1717,13 +1723,15 @@ export default function FoodBeverage() {
                       <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Category</th>
                       <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Price</th>
                       <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Status</th>
-                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Actions</th>
+                      {canManageFBItems() && (
+                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {restaurantItems.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="text-center py-8 text-gray-500">
+                        <td colSpan={canManageFBItems() ? "5" : "4"} className="text-center py-8 text-gray-500">
                           No items found
                         </td>
                       </tr>
@@ -1753,31 +1761,33 @@ export default function FoodBeverage() {
                               {item.is_available ? 'Available' : 'Not Available'}
                             </span>
                           </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => {
-                                  setEditingRestaurantItem(item)
-                                  setNewRestaurantItem({
-                                    item_name: item.item_name,
-                                    category: item.category,
-                                    unit_price: item.unit_price,
-                                    description: item.description || '',
-                                    is_available: item.is_available
-                                  })
-                                }}
-                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-primary-400 transition-colors"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteRestaurantItem(item.id)}
-                                className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </td>
+                          {canManageFBItems() && (
+                            <td className="py-4 px-4">
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingRestaurantItem(item)
+                                    setNewRestaurantItem({
+                                      item_name: item.item_name,
+                                      category: item.category,
+                                      unit_price: item.unit_price,
+                                      description: item.description || '',
+                                      is_available: item.is_available
+                                    })
+                                  }}
+                                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-primary-400 transition-colors"
+                                >
+                                  <Edit2 size={18} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteRestaurantItem(item.id)}
+                                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       ))
                     )}

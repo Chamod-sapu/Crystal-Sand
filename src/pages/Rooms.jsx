@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import { formatCurrency, calculateBillTotal } from '../utils/calculations'
 import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag } from 'lucide-react'
 import { format, addDays, differenceInDays } from 'date-fns'
@@ -21,6 +22,7 @@ Make sure all existing room_type values in rooms table exist in room_types.code 
 */
 
 export default function Rooms() {
+  const { canManageRooms } = useAuth()
   const [rooms, setRooms] = useState([])
   const [roomTypes, setRoomTypes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -661,16 +663,18 @@ export default function Rooms() {
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Rooms Management</h1>
           <p className="text-slate-500 dark:text-gray-400 mt-1">Manage hotel rooms and availability</p>
         </div>
-        <button
-          onClick={() => {
-            resetForm()
-            setShowForm(true)
-          }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus size={20} />
-          <span>New Room </span>
-        </button>
+        {canManageRooms() && (
+          <button
+            onClick={() => {
+              resetForm()
+              setShowForm(true)
+            }}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus size={20} />
+            <span>New Room </span>
+          </button>
+        )}
       </div>
 
       {/* Modal Popup for Add/Edit Room */}
@@ -959,25 +963,27 @@ export default function Rooms() {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <div className="text-slate-500 dark:text-gray-400 text-xs mb-2">Actions</div>
-                    <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(room)}
-                        className="flex-1 flex items-center justify-center space-x-1 p-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors text-sm"
-                      >
-                        <Edit2 size={16} />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(room.id)}
-                        className="flex-1 flex items-center justify-center space-x-1 p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm"
-                      >
-                        <Trash2 size={16} />
-                        <span>Delete</span>
-                      </button>
+                  {canManageRooms() && (
+                    <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
+                      <div className="text-slate-500 dark:text-gray-400 text-xs mb-2">Actions</div>
+                      <div className="flex items-center justify-center space-x-2">
+                        <button
+                          onClick={() => handleEdit(room)}
+                          className="flex-1 flex items-center justify-center space-x-1 p-2 bg-primary-600 hover:bg-primary-700 rounded-lg text-white transition-colors text-sm"
+                        >
+                          <Edit2 size={16} />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(room.id)}
+                          className="flex-1 flex items-center justify-center space-x-1 p-2 bg-red-600 hover:bg-red-700 rounded-lg text-white transition-colors text-sm"
+                        >
+                          <Trash2 size={16} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             )
