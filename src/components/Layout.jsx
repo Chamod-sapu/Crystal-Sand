@@ -10,10 +10,18 @@ import {
   TrendingUp,
   Coffee,
   Sun,
-  Moon
+  Moon,
+  Settings,
+  LogOut,
+  ShieldCheck,
+  Shield,
+  User,
+  Activity,
+  DollarSign
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
+import { useAuth } from '../context/AuthContext'
 import logo from '../Images/Untitled design (2).png'
 
 export default function Layout({ children }) {
@@ -21,19 +29,58 @@ export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const { isDarkMode, toggleTheme } = useTheme()
+  const { userProfile, isSuperAdmin, canManageUsers, canManageSystem, logout } = useAuth()
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Guests', href: '/guests', icon: Users },
-    { name: 'Rooms', href: '/rooms', icon: Building2 },
-    { name: 'F & B', href: '/food-beverage', icon: Coffee },
-    { name: 'Forecast', href: '/forecast', icon: TrendingUp },
+    { name: 'Dashboard', href: '/', icon: LayoutDashboard, show: true },
+    { name: 'Guests', href: '/guests', icon: Users, show: true },
+    { name: 'Rooms', href: '/rooms', icon: Building2, show: true },
+    { name: 'F & B', href: '/food-beverage', icon: Coffee, show: true },
+    { name: 'Forecast', href: '/forecast', icon: TrendingUp, show: true },
+    { name: 'Sales', href: '/sales', icon: DollarSign, show: canManageUsers() },
+    { name: 'Activity', href: '/activity', icon: Activity, show: canManageUsers() },
+    { name: 'Users', href: '/users', icon: Users, show: canManageUsers() },
+    { name: 'System', href: '/system-settings', icon: Settings, show: canManageSystem() },
   ]
 
   const isActive = (path) => {
     if (path === '/' && location.pathname === '/') return true
     if (path !== '/' && location.pathname.startsWith(path)) return true
     return false
+  }
+
+  function getRoleIcon() {
+    if (!userProfile) return null
+    switch (userProfile.role) {
+      case 'super_admin':
+        return <ShieldCheck size={14} className="text-amber-400" />
+      case 'admin':
+        return <Shield size={14} className="text-blue-400" />
+      default:
+        return <User size={14} className="text-slate-400" />
+    }
+  }
+
+  function getRoleLabel() {
+    if (!userProfile) return ''
+    switch (userProfile.role) {
+      case 'super_admin': return 'Super Admin'
+      case 'admin': return 'Admin'
+      default: return 'User'
+    }
+  }
+
+  function getRoleBadgeColor() {
+    if (!userProfile) return ''
+    switch (userProfile.role) {
+      case 'super_admin': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+      case 'admin': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+    }
+  }
+
+  async function handleLogout() {
+    await logout()
   }
 
   return (
@@ -80,7 +127,7 @@ export default function Layout({ children }) {
           </div>
 
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin">
-            {navigation.map((item) => {
+            {navigation.filter(item => item.show).map((item) => {
               const Icon = item.icon
               return (
                 <Link
@@ -100,6 +147,7 @@ export default function Layout({ children }) {
             })}
           </nav>
 
+          {/* Theme Toggle */}
           <div className="p-4 border-t border-slate-200 dark:border-slate-800">
             <button
               onClick={toggleTheme}
@@ -112,6 +160,39 @@ export default function Layout({ children }) {
                 <span className="font-medium">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
               </div>
             </button>
+          </div>
+
+          {/* User Profile & Logout */}
+          <div className="px-4 py-4 border-t border-slate-200 dark:border-slate-800">
+            {userProfile && (
+              <div className="mb-3">
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm ${
+                    userProfile.role === 'super_admin' ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                    userProfile.role === 'admin' ? 'bg-gradient-to-br from-blue-500 to-indigo-600' :
+                    'bg-gradient-to-br from-slate-500 to-slate-600'
+                  }`}>
+                    {userProfile.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                      {userProfile.full_name}
+                    </p>
+                    <div className={`inline-flex items-center space-x-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${getRoleBadgeColor()}`}>
+                      {getRoleIcon()}
+                      <span>{getRoleLabel()}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors text-sm font-medium"
+                >
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800">
