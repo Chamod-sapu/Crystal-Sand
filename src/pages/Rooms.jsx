@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { logActivity } from '../lib/activityLogger'
 import { useAuth } from '../context/AuthContext'
 import { formatCurrency, calculateBillTotal } from '../utils/calculations'
 import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag } from 'lucide-react'
@@ -397,12 +398,15 @@ export default function Rooms() {
           .eq('id', editingRoom.id)
 
         if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from('rooms')
-          .insert([formData])
-
-        if (error) throw error
+        
+        // Log activity
+        await logActivity(
+          userProfile,
+          editingRoom ? 'update' : 'create',
+          'room',
+          `${editingRoom ? 'Updated' : 'Created'} room ${formData.room_number} (${formData.room_type})`,
+          editingRoom ? editingRoom.id : null
+        )
       }
 
       resetForm()
@@ -462,6 +466,16 @@ export default function Rooms() {
         .eq('id', roomId)
 
       if (error) throw error
+      
+      // Log activity
+      await logActivity(
+        userProfile,
+        'delete',
+        'room',
+        `Deleted room ${room.room_number}`,
+        roomId
+      )
+      
       loadRooms()
     } catch (error) {
       console.error('Error deleting room:', error)

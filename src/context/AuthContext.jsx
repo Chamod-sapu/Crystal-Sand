@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { logActivity } from '../lib/activityLogger'
 
 const AuthContext = createContext()
 
@@ -148,6 +149,9 @@ export function AuthProvider({ children }) {
       setUserProfile(profile)
       setIsSystemActive(settings?.is_system_active ?? true)
 
+      // Log successful login
+      await logActivity(profile, 'login', 'user', `User ${profile.full_name} logged in successfully`)
+
       return { user: data.user, profile }
     } catch (err) {
       throw err
@@ -157,6 +161,9 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    if (userProfile) {
+      await logActivity(userProfile, 'logout', 'user', `User ${userProfile.full_name} logged out`)
+    }
     await supabase.auth.signOut()
     setUser(null)
     setUserProfile(null)
