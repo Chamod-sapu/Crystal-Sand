@@ -15,7 +15,7 @@ export async function logActivity(userProfile, action, entityType, description, 
   if (!userProfile) return
 
   try {
-    await supabase.from('user_activity_log').insert([{
+    const { error } = await supabase.from('user_activity_log').insert([{
       user_id: userProfile.id,
       user_name: userProfile.full_name,
       user_role: userProfile.role,
@@ -25,8 +25,12 @@ export async function logActivity(userProfile, action, entityType, description, 
       description,
       metadata
     }])
-  } catch (error) {
-    // Activity logging is non-critical — don't break the app if it fails
-    console.warn('Activity log failed (non-critical):', error.message)
+
+    if (error) {
+      console.warn('Activity log failed (non-critical):', error.message)
+    }
+  } catch (err) {
+    // Fallback for unexpected JS errors
+    console.warn('Activity log error (unexpected):', err.message)
   }
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { formatCurrency } from '../utils/calculations'
+import { logActivity } from '../lib/activityLogger'
 import {
   Coffee,
   Plus,
@@ -22,7 +23,7 @@ import {
 import { format } from 'date-fns'
 
 export default function FoodBeverage() {
-  const { canManageFBItems } = useAuth()
+  const { canManageFBItems, userProfile } = useAuth()
   const [rooms, setRooms] = useState([])
   const [tables, setTables] = useState([])
   const [guests, setGuests] = useState([])
@@ -47,6 +48,7 @@ export default function FoodBeverage() {
   const [restaurantItemSearch, setRestaurantItemSearch] = useState('')
   const [showRoomItemDropdown, setShowRoomItemDropdown] = useState(false)
   const [showRestaurantItemDropdown, setShowRestaurantItemDropdown] = useState(false)
+  const [activeTab, setActiveTab] = useState('room-service')
 
   const [newItem, setNewItem] = useState({
     category_id: '',
@@ -234,32 +236,6 @@ export default function FoodBeverage() {
     return room.status
   }
 
-  function getRoomStatusColor(status) {
-    switch (status) {
-      case 'occupied':
-        return 'border-red-500'
-      case 'available':
-        return 'border-green-500'
-      case 'reserved':
-        return 'border-yellow-500'
-      default:
-        return 'border-gray-500'
-    }
-  }
-
-  function getTableStatusColor(status) {
-    switch (status) {
-      case 'occupied':
-        return 'border-red-500'
-      case 'available':
-        return 'border-green-500'
-      case 'reserved':
-        return 'border-yellow-500'
-      default:
-        return 'border-gray-500'
-    }
-  }
-
   function getConsumptionCount(roomId) {
     const roomConsumptions = consumptions.filter(c => c.room_id === roomId)
     return roomConsumptions.reduce((sum, c) => sum + c.quantity, 0)
@@ -310,6 +286,8 @@ export default function FoodBeverage() {
       item_name: '',
       category_name: ''
     })
+    setRoomItemSearch('')
+    setShowRoomItemDropdown(false)
   }
 
   function resetNewRestaurantOrder() {
@@ -320,6 +298,8 @@ export default function FoodBeverage() {
       item_name: '',
       notes: ''
     })
+    setRestaurantItemSearch('')
+    setShowRestaurantItemDropdown(false)
   }
 
   function resetNewRestaurantItem() {
@@ -331,42 +311,6 @@ export default function FoodBeverage() {
       is_available: true
     })
     setEditingRestaurantItem(null)
-  }
-
-  function handleCategoryChange(categoryId) {
-    const category = categories.find(c => c.id === categoryId)
-    setNewItem({
-      ...newItem,
-      category_id: categoryId,
-      category_name: category?.name || '',
-      item_id: '',
-      item_name: '',
-      unit_price: 0
-    })
-  }
-
-  function handleItemChange(itemId) {
-    const item = menuItems.find(m => m.id === itemId)
-    if (item) {
-      setNewItem({
-        ...newItem,
-        item_id: itemId,
-        item_name: item.item_name,
-        unit_price: item.unit_price
-      })
-    }
-  }
-
-  function handleRestaurantItemChange(itemId) {
-    const item = restaurantItems.find(i => i.id === itemId)
-    if (item) {
-      setNewRestaurantOrder({
-        ...newRestaurantOrder,
-        item_id: itemId,
-        item_name: item.item_name,
-        unit_price: item.unit_price
-      })
-    }
   }
 
   async function handleAddItem(e) {
@@ -400,6 +344,17 @@ export default function FoodBeverage() {
       loadConsumptions(selectedRoom.id)
       setShowAddItem(false)
       resetNewItem()
+
+      // Log activity
+      const guest = getRoomGuest(selectedRoom.room_number)
+      logActivity(
+        userProfile,
+        'create',
+        'fb_item',
+        `Added ${newItem.quantity}x ${newItem.item_name} to Room ${selectedRoom.room_number}`,
+        selectedRoom.id,
+        { guest_id: guest?.id, room_id: selectedRoom.id }
+      )
     } catch (error) {
       console.error('Error adding item:', error)
       showNotification('Failed to add item', 'error')
@@ -443,6 +398,15 @@ export default function FoodBeverage() {
       loadTables()
       setShowAddRestaurantItem(false)
       resetNewRestaurantOrder()
+
+      // Log activity
+      logActivity(
+        userProfile,
+        'create',
+        'fb_item',
+        `Added ${newRestaurantOrder.quantity}x ${newRestaurantOrder.item_name} to Table ${selectedTable.table_number}`,
+        selectedTable.id
+      )
     } catch (error) {
       console.error('Error adding order:', error)
       showNotification('Failed to add order', 'error')
@@ -457,15 +421,36 @@ export default function FoodBeverage() {
       return
     }
 
+    const trimmedName = newRestaurantItem.item_name.trim()
+
+    // Check for duplicates before adding new item
+    if (!editingRestaurantItem) {
+      const isDuplicate = restaurantItems.some(
+        item => item.item_name.trim().toLowerCase() === trimmedName.toLowerCase()
+      )
+      if (isDuplicate) {
+        showNotification('An item with this name already exists', 'error')
+        return
+      }
+    }
+
     try {
+      const itemToSave = { ...newRestaurantItem, item_name: trimmedName }
       if (editingRestaurantItem) {
         const { error } = await supabase
           .from('restaurant_items')
-          .update(newRestaurantItem)
+          .update(itemToSave)
           .eq('id', editingRestaurantItem.id)
 
         if (error) throw error
         showNotification('Item updated successfully', 'success')
+        logActivity(
+          userProfile,
+          'update',
+          'fb_item',
+          `Updated menu item: ${newRestaurantItem.item_name}`,
+          editingRestaurantItem.id
+        )
       } else {
         const { error } = await supabase
           .from('restaurant_items')
@@ -473,6 +458,12 @@ export default function FoodBeverage() {
 
         if (error) throw error
         showNotification('Item added successfully', 'success')
+        logActivity(
+          userProfile,
+          'create',
+          'fb_item',
+          `Added new menu item: ${newRestaurantItem.item_name}`
+        )
       }
 
       loadRestaurantItems()
@@ -495,6 +486,13 @@ export default function FoodBeverage() {
       if (error) throw error
 
       showNotification('Item deleted successfully', 'success')
+      logActivity(
+        userProfile,
+        'delete',
+        'fb_item',
+        `Deleted menu item with ID: ${itemId}`,
+        itemId
+      )
       loadRestaurantItems()
     } catch (error) {
       console.error('Error deleting item:', error)
@@ -563,6 +561,14 @@ export default function FoodBeverage() {
       if (error) throw error
 
       showNotification('Item removed', 'success')
+      logActivity(
+        userProfile,
+        'delete',
+        'fb_item',
+        `Removed item from Room ${selectedRoom.room_number} bill`,
+        selectedRoom.id,
+        { room_id: selectedRoom.id }
+      )
       loadConsumptions(selectedRoom.id)
     } catch (error) {
       console.error('Error deleting item:', error)
@@ -580,6 +586,13 @@ export default function FoodBeverage() {
       if (error) throw error
 
       showNotification('Order removed', 'success')
+      logActivity(
+        userProfile,
+        'delete',
+        'fb_item',
+        `Removed order from Table ${selectedTable.table_number}`,
+        selectedTable.id
+      )
       loadRestaurantOrders(selectedTable.id)
 
       // Check if table has any remaining orders
@@ -799,6 +812,16 @@ export default function FoodBeverage() {
         .eq('id', selectedTable.id)
 
       showNotification('Bill completed successfully', 'success')
+      
+      // Log activity
+      logActivity(
+        userProfile,
+        'update',
+        'bill',
+        `Completed bill for Table ${selectedTable.table_number}`,
+        selectedTable.id
+      )
+
       loadTables()
       closeRestaurantPanel()
     } catch (error) {
@@ -842,6 +865,16 @@ export default function FoodBeverage() {
         .eq('room_id', selectedRoom.id)
 
       showNotification('Items added to room bill successfully', 'success')
+      
+      logActivity(
+        userProfile,
+        'update',
+        'bill',
+        `Transferred F&B bill to Room ${selectedRoom.room_number} folio`,
+        selectedRoom.id,
+        { guest_id: guest.id, room_id: selectedRoom.id }
+      )
+
       loadConsumptions(selectedRoom.id)
       closePanel()
     } catch (error) {
@@ -850,7 +883,7 @@ export default function FoodBeverage() {
     }
   }
 
-  const filteredRooms = searchTerm
+  const filteredRooms = searchTerm && activeTab === 'room-service'
     ? rooms.filter(room => {
         const roomMatch = room.room_number.toLowerCase().includes(searchTerm.toLowerCase())
         const guest = getRoomGuest(room.room_number)
@@ -860,9 +893,11 @@ export default function FoodBeverage() {
       })
     : rooms
 
-  const filteredMenuItems = menuItems.filter(item =>
-    !newItem.category_id || item.category_id === newItem.category_id
-  )
+  const filteredTables = searchTerm && activeTab === 'restaurant'
+    ? tables.filter(table => table.table_number.toLowerCase().includes(searchTerm.toLowerCase()))
+    : tables
+
+
 
   if (loading) {
     return (
@@ -897,9 +932,9 @@ export default function FoodBeverage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center space-x-3">
             <Coffee size={32} className="text-primary-400" />
-            <span>F & B Management</span>
+            <span>Food & Beverage</span>
           </h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage Food and Beverage</p>
+          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage room service orders and restaurant operations</p>
         </div>
         {canManageFBItems() && (
           <button
@@ -907,177 +942,213 @@ export default function FoodBeverage() {
             className="btn-primary flex items-center space-x-2"
           >
             <Utensils size={20} />
-            <span>Manage Restaurant Items</span>
+            <span>Menu Management</span>
           </button>
         )}
       </div>
 
-      {/* Search Bar */}
+      {/* Search and Tabs */}
       <div className="card p-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
-          <input
-            type="text"
-            placeholder="Enter GRC Number"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="input-field pl-10"
-          />
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex-1 w-full md:max-w-md relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+            <input
+              type="text"
+              placeholder={activeTab === 'room-service' ? "Search rooms, guests, or GRC..." : "Search tables..."}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-field w-full pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg shadow-inner">
+              <button
+                onClick={() => setActiveTab('room-service')}
+                className={`flex items-center space-x-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                  activeTab === 'room-service'
+                    ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                    : 'text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Coffee size={16} />
+                <span>Room Service</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('restaurant')}
+                className={`flex items-center space-x-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                  activeTab === 'restaurant'
+                    ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 shadow-sm'
+                    : 'text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Utensils size={16} />
+                <span>Restaurant</span>
+              </button>
+            </div>
+            <div className="flex items-center space-x-4 border-l border-slate-200 dark:border-slate-800 pl-4 hidden sm:flex">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full shadow-sm shadow-red-500/50"></div>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Occupied</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-green-500 rounded-full shadow-sm shadow-green-500/50"></div>
+                <span className="text-xs text-slate-500 dark:text-gray-400">Available</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Rooms Section */}
-      <div className="card p-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Rooms</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-4">
+      {/* Grid Content */}
+      {activeTab === 'room-service' ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {filteredRooms.map(room => {
             const status = getRoomStatus(room)
             const guest = getRoomGuest(room.room_number)
             const itemCount = getConsumptionCount(room.id)
+            const isOccupied = status === 'occupied'
 
             return (
               <button
                 key={room.id}
                 onClick={() => handleRoomClick(room)}
-                className={`relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                  getRoomStatusColor(status)
-                } ${
-                  status === 'occupied'
-                    ? 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer hover:scale-105'
-                    : 'bg-white dark:bg-slate-900 opacity-50 cursor-not-allowed'
+                disabled={!isOccupied}
+                className={`card p-5 border-2 transition-all hover:shadow-lg relative text-left ${
+                  isOccupied
+                    ? 'border-red-500/50 dark:border-red-400/40 cursor-pointer'
+                    : 'border-green-500/50 dark:border-green-400/40 cursor-not-allowed opacity-60'
                 }`}
               >
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                    NO {room.room_number}
+                {itemCount > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                    {itemCount}
                   </div>
-                  <div className={`text-xs font-medium ${
-                    status === 'occupied' ? 'text-red-400' :
-                    status === 'available' ? 'text-green-400' :
-                    'text-yellow-400'
-                  }`}>
-                    {status.toUpperCase()}
+                )}
+                
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className={`p-3 rounded-lg ${isOccupied ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                    <Coffee size={24} />
                   </div>
-                  {guest && (
-                    <div className="mt-2 text-xs text-slate-500 dark:text-gray-400 truncate">
-                      {guest.name_with_initials}
+                  
+                  <div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white">
+                      {room.room_number}
                     </div>
-                  )}
-                  {itemCount > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg">
-                      {itemCount}
+                    <div className={`text-xs font-medium uppercase mt-1 ${isOccupied ? 'text-red-500' : 'text-green-500'}`}>
+                      {status}
                     </div>
+                  </div>
+
+                  {guest ? (
+                    <div className="w-full pt-2 border-t border-slate-200 dark:border-slate-700">
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                        {guest.name_with_initials}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {guest.grc_number}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="h-8"></div>
                   )}
                 </div>
               </button>
             )
           })}
         </div>
-      </div>
-
-      {/* Restaurant Section */}
-      <div className="card p-6">
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Restaurant</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-4">
-          {tables.map(table => {
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {filteredTables.map(table => {
             const orderCount = getTableOrderCount(table.id)
+            const isOccupied = table.status === 'occupied'
 
             return (
               <button
                 key={table.id}
                 onClick={() => handleTableClick(table)}
-                className={`relative p-6 rounded-lg border-2 transition-all duration-200 ${
-                  getTableStatusColor(table.status)
-                } bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer hover:scale-105`}
+                className={`card p-5 border-2 transition-all hover:shadow-lg relative text-left ${
+                  isOccupied
+                    ? 'border-red-500/50 dark:border-red-400/40'
+                    : 'border-green-500/50 dark:border-green-400/40'
+                }`}
               >
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-                    {table.table_number}
+                {orderCount > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold z-10">
+                    {orderCount}
                   </div>
-                  <div className={`text-xs font-medium ${
-                    table.status === 'occupied' ? 'text-red-400' :
-                    table.status === 'available' ? 'text-green-400' :
-                    'text-yellow-400'
-                  }`}>
-                    {table.status.toUpperCase()}
+                )}
+                
+                <div className="flex flex-col items-center text-center space-y-2">
+                  <div className={`p-3 rounded-lg ${isOccupied ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                    <Utensils size={24} />
                   </div>
-                  {orderCount > 0 && (
-                    <div className="absolute -top-2 -right-2 bg-primary-600 text-white rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold shadow-lg">
-                      {orderCount}
+                  
+                  <div>
+                    <div className="text-xl font-bold text-slate-900 dark:text-white">
+                      {table.table_number}
                     </div>
-                  )}
+                    <div className={`text-xs font-medium uppercase mt-1 ${isOccupied ? 'text-red-500' : 'text-green-500'}`}>
+                      {table.status}
+                    </div>
+                  </div>
                 </div>
               </button>
             )
           })}
         </div>
-      </div>
+      )}
 
-      {/* Room Consumption Panel */}
-      {showPanel && selectedRoom && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-end animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
+      {/* Modern Overlay Panels */}
+      {(showPanel || showRestaurantPanel) && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if(e.target === e.currentTarget) activeTab === 'room-service' ? closePanel() : closeRestaurantPanel() }}
+        >
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             {/* Panel Header */}
-            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                  <ShoppingCart size={24} className="text-primary-400" />
-                  <span>Room {selectedRoom.room_number} - F&B Consumption</span>
-                </h2>
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-3 bg-primary-600/20 rounded-lg">
+                    {activeTab === 'room-service' ? <Coffee size={22} className="text-primary-400" /> : <Utensils size={22} className="text-primary-400" />}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+                      {activeTab === 'room-service' ? `Room ${selectedRoom?.room_number}` : `Table ${selectedTable?.table_number}`}
+                    </h2>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">Order Management</p>
+                  </div>
+                </div>
                 <button
-                  onClick={closePanel}
-                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  onClick={activeTab === 'room-service' ? closePanel : closeRestaurantPanel}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 >
-                  <X size={24} className="text-slate-500 dark:text-gray-400" />
+                  <X size={20} className="text-slate-500 dark:text-gray-400" />
                 </button>
               </div>
 
               {/* Guest Info */}
-              {currentGuest && (
-                <div className="grid grid-cols-2 gap-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <User className="text-primary-400" size={18} />
-                    <div>
-                      <div className="text-xs text-gray-500">Guest Name</div>
-                      <div className="text-slate-900 dark:text-white font-medium">{currentGuest.name_with_initials}</div>
-                    </div>
+              {activeTab === 'room-service' && currentGuest && (
+                <div className="flex flex-wrap gap-4 mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                  <div className="flex-1 min-w-[120px]">
+                    <p className="text-xs text-slate-500 dark:text-gray-400 mb-1">Guest</p>
+                    <p className="font-medium text-slate-900 dark:text-white truncate">{currentGuest.name_with_initials}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="text-slate-900 dark:text-white" size={18} />
-                    <div>
-                      <div className="text-xs text-gray-500">GRC Number</div>
-                      <div className="text-primary-400 font-medium">{currentGuest.grc_number}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="text-slate-900 dark:text-white" size={18} />
-                    <div>
-                      <div className="text-xs text-gray-500">Check-in</div>
-                      <div className="text-slate-900 dark:text-white font-medium">
-                        {format(new Date(currentGuest.date_of_arrival), 'MMM dd, yyyy')}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="text-green-400" size={18} />
-                    <div>
-                      <div className="text-xs text-gray-500">Status</div>
-                      <div className="text-green-400 font-medium">
-                        {currentGuest.status.replace('_', ' ').toUpperCase()}
-                      </div>
-                    </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <p className="text-xs text-slate-500 dark:text-gray-400 mb-1">GRC</p>
+                    <p className="font-medium text-slate-900 dark:text-white font-mono">{currentGuest.grc_number}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Panel Content */}
+            {/* Panel Body */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Consumption Items</h3>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Current Orders</h3>
                 <button
-                  onClick={() => setShowAddItem(true)}
-                  className="btn-primary flex items-center space-x-2 text-sm"
+                  onClick={() => activeTab === 'room-service' ? setShowAddItem(true) : setShowAddRestaurantItem(true)}
+                  className="btn-primary flex items-center space-x-2"
                 >
                   <Plus size={18} />
                   <span>Add Item</span>
@@ -1085,714 +1156,334 @@ export default function FoodBeverage() {
               </div>
 
               {/* Add Item Form */}
-              {showAddItem && (
-                <form onSubmit={handleAddItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-primary-600/20">
+              {(showAddItem || showAddRestaurantItem) && (
+                <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-slate-900 dark:text-white font-semibold">Add New Item</h4>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddItem(false)
-                        resetNewItem()
-                      }}
-                      className="text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
-                    >
-                      <X size={20} />
+                    <h4 className="font-medium text-slate-900 dark:text-white">Select Item</h4>
+                    <button onClick={() => activeTab === 'room-service' ? setShowAddItem(false) : setShowAddRestaurantItem(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={18} />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 relative">
-                      <label className="label">Restaurant Item *</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={roomItemSearch || newItem.item_name}
-                          onChange={(e) => {
-                            setRoomItemSearch(e.target.value)
-                            setShowRoomItemDropdown(true)
-                          }}
-                          onFocus={() => setShowRoomItemDropdown(true)}
-                          className="input-field w-full"
-                          placeholder="Type to search items..."
-                        />
-                        {showRoomItemDropdown && (
-                          <div className="absolute z-50 w-full mt-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                            {Array.from(new Map(restaurantItems
-                              .filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase()))
-                              .map(item => [item.item_name, item])).values())
-                              .map(item => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
-                                  onClick={() => {
-                                    setNewItem({
-                                      ...newItem,
-                                      item_id: item.id,
-                                      item_name: item.item_name,
-                                      category: item.category,
-                                      unit_price: item.unit_price
-                                    })
-                                    setRoomItemSearch(item.item_name)
-                                    setShowRoomItemDropdown(false)
-                                  }}
-                                >
-                                  <div className="font-medium text-sm">{item.item_name}</div>
-                                  <div className="text-xs text-slate-500 dark:text-gray-400">{formatCurrency(item.unit_price)}</div>
-                                </button>
-                              ))}
-                            {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((roomItemSearch || '').toLowerCase())).length === 0 && (
-                              <div className="px-4 py-3 text-sm text-gray-500 text-center italic">No items found</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="label">Quantity *</label>
-                      <input
-                        type="number"
-                        value={newItem.quantity}
-                        onChange={(e) => setNewItem({ ...newItem, quantity: parseInt(e.target.value) || 1 })}
-                        className="input-field"
-                        min="1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">Unit Price (LKR)</label>
-                      <input
-                        type="number"
-                        value={newItem.unit_price}
-                        className="input-field bg-white dark:bg-slate-900 cursor-not-allowed"
-                        readOnly
-                        tabIndex={-1}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-3 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-gray-400">Total</span>
-                      <span className="text-primary-400 font-bold text-lg">
-                        {formatCurrency(newItem.quantity * newItem.unit_price)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddItem(false)
-                        resetNewItem()
-                      }}
-                      className="btn-secondary"
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn-primary">
-                      Add Item
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Consumption Table */}
-              {consumptions.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Coffee size={48} className="mx-auto mb-4 opacity-50" />
-                  <p>No items consumed yet</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Category</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Qty</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Unit Price</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Total</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Time</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {consumptions.map(consumption => (
-                        <tr key={consumption.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                          <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{consumption.item_name}</td>
-                          <td className="py-4 px-4">
-                            <span className="px-2 py-1 bg-primary-600/20 text-primary-400 rounded text-xs">
-                              {consumption.category}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
-                              >
-                                -
-                              </button>
-                              <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{consumption.quantity}</span>
-                              <button
-                                onClick={() => handleUpdateQuantity(consumption.id, consumption.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </td>
-                           <td className="py-4 px-4 text-slate-600 dark:text-gray-300">{formatCurrency(consumption.unit_price)}</td>
-                           <td className="py-4 px-4 text-primary-600 dark:text-primary-400 font-bold">{formatCurrency(consumption.total_price)}</td>
-                          <td className="py-4 px-4 text-slate-500 dark:text-gray-400 text-sm">
-                            {format(new Date(consumption.consumed_at), 'MMM dd, HH:mm')}
-                          </td>
-                          <td className="py-4 px-4">
-                            <button
-                              onClick={() => handleDeleteItem(consumption.id)}
-                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Summary Footer */}
-            {consumptions.length > 0 && summary && (
-              <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                    <span>Subtotal</span>
-                    <span className="font-medium">{formatCurrency(summary.subtotal)}</span>
-                  </div>
-                  {settings?.service_charge_percentage > 0 && (
-                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                      <span>Service Charge ({settings.service_charge_percentage}%)</span>
-                      <span className="font-medium">{formatCurrency(summary.serviceCharge)}</span>
-                    </div>
-                  )}
-                  {settings?.vat_percentage > 0 && (
-                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                      <span>VAT ({settings.vat_percentage}%)</span>
-                      <span className="font-medium">{formatCurrency(summary.vat)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <span className="text-slate-900 dark:text-white font-bold text-xl">Grand Total</span>
-                    <span className="text-primary-400 font-bold text-2xl">
-                      {formatCurrency(summary.grandTotal)}
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleAddToRoomBill}
-                    className="w-full btn-primary py-4 text-lg mt-4"
-                  >
-                    Add to Room Bill
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Restaurant Order Panel */}
-      {showRestaurantPanel && selectedTable && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-end animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 h-full w-full max-w-4xl overflow-hidden flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
-            {/* Panel Header */}
-            <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
-                  <Utensils size={24} className="text-primary-400" />
-                  <span>Table {selectedTable.table_number} - Restaurant Orders</span>
-                </h2>
-                <button
-                  onClick={closeRestaurantPanel}
-                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <X size={24} className="text-slate-500 dark:text-gray-400" />
-                </button>
-              </div>
-
-              {/* Table Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                <div>
-                  <div className="text-xs text-gray-500">Table Number</div>
-                  <div className="text-slate-900 dark:text-white font-medium text-lg">{selectedTable.table_number}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500">Status</div>
-                  <div className={`font-medium ${
-                    selectedTable.status === 'occupied' ? 'text-red-400' :
-                    selectedTable.status === 'available' ? 'text-green-400' :
-                    'text-yellow-400'
-                  }`}>
-                    {selectedTable.status.toUpperCase()}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Panel Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Orders</h3>
-                <button
-                  onClick={() => setShowAddRestaurantItem(true)}
-                  className="btn-primary flex items-center space-x-2 text-sm"
-                >
-                  <Plus size={18} />
-                  <span>Add Order</span>
-                </button>
-              </div>
-
-              {/* Add Order Form */}
-              {showAddRestaurantItem && (
-                <form onSubmit={handleAddRestaurantOrder} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg border border-primary-600/20">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-slate-900 dark:text-white font-semibold">Add New Order</h4>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddRestaurantItem(false)
-                        resetNewRestaurantOrder()
-                      }}
-                      className="text-slate-500 dark:text-gray-400 hover:text-slate-900 dark:text-white transition-colors"
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 relative">
-                      <label className="label">Item *</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={restaurantItemSearch || newRestaurantOrder.item_name}
-                          onChange={(e) => {
-                            setRestaurantItemSearch(e.target.value)
-                            setShowRestaurantItemDropdown(true)
-                          }}
-                          onFocus={() => setShowRestaurantItemDropdown(true)}
-                          className="input-field w-full"
-                          placeholder="Type to search items..."
-                        />
-                        {showRestaurantItemDropdown && (
-                          <div className="absolute z-50 w-full mt-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                            {Array.from(new Map(restaurantItems
-                              .filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase()))
-                              .map(item => [item.item_name, item])).values())
-                              .map(item => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="w-full text-left px-4 py-2 hover:bg-primary-600/20 text-slate-900 dark:text-white transition-colors border-b border-slate-200 dark:border-slate-700 last:border-0"
-                                  onClick={() => {
-                                    setNewRestaurantOrder({
-                                      ...newRestaurantOrder,
-                                      item_id: item.id,
-                                      item_name: item.item_name,
-                                      unit_price: item.unit_price
-                                    })
-                                    setRestaurantItemSearch(item.item_name)
-                                    setShowRestaurantItemDropdown(false)
-                                  }}
-                                >
-                                  <div className="font-medium text-sm">{item.item_name}</div>
-                                  <div className="text-xs text-slate-500 dark:text-gray-400">{formatCurrency(item.unit_price)}</div>
-                                </button>
-                              ))}
-                            {restaurantItems.filter(i => i.is_available && i.item_name.toLowerCase().includes((restaurantItemSearch || '').toLowerCase())).length === 0 && (
-                              <div className="px-4 py-3 text-sm text-gray-500 text-center italic">No items found</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="label">Quantity *</label>
-                      <input
-                        type="number"
-                        value={newRestaurantOrder.quantity}
-                        onChange={(e) => setNewRestaurantOrder({ ...newRestaurantOrder, quantity: parseInt(e.target.value) || 1 })}
-                        className="input-field"
-                        min="1"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">Unit Price (LKR)</label>
-                      <input
-                        type="number"
-                        value={newRestaurantOrder.unit_price}
-                        className="input-field bg-white dark:bg-slate-900 cursor-not-allowed"
-                        readOnly
-                        tabIndex={-1}
-                      />
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="label">Special Notes</label>
-                      <textarea
-                        value={newRestaurantOrder.notes}
-                        onChange={(e) => setNewRestaurantOrder({ ...newRestaurantOrder, notes: e.target.value })}
-                        className="input-field"
-                        rows="2"
-                        placeholder="e.g., Extra spicy, No onions..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 p-3 bg-slate-700 rounded-lg">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-gray-400">Total</span>
-                      <span className="text-primary-400 font-bold text-lg">
-                        {formatCurrency(newRestaurantOrder.quantity * newRestaurantOrder.unit_price)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-3 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddRestaurantItem(false)
-                        resetNewRestaurantOrder()
-                      }}
-                      className="btn-secondary"
-                    >
-                      Cancel
-                    </button>
-                    <button type="submit" className="btn-primary">
-                      Add Order
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* Orders Table */}
-              {restaurantOrders.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  <Utensils size={48} className="mx-auto mb-4 opacity-50" />
-                  <p>No orders yet</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700">
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Qty</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Unit Price</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Total</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Notes</th>
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {restaurantOrders.map(order => (
-                        <tr key={order.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                          <td className="py-4 px-4 text-slate-900 dark:text-white font-medium">{order.item_name}</td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => handleUpdateOrderQuantity(order.id, order.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
-                              >
-                                -
-                              </button>
-                              <span className="text-slate-900 dark:text-white font-medium w-8 text-center">{order.quantity}</span>
-                              <button
-                                onClick={() => handleUpdateRestaurantQuantity(order.id, order.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded text-slate-900 dark:text-white text-sm"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 text-gray-300">{formatCurrency(order.unit_price)}</td>
-                          <td className="py-4 px-4 text-primary-400 font-bold">{formatCurrency(order.total_price)}</td>
-                          <td className="py-4 px-4 text-slate-500 dark:text-gray-400 text-sm">
-                            {order.notes || '-'}
-                          </td>
-                          <td className="py-4 px-4">
-                            <button
-                              onClick={() => handleDeleteOrder(order.id)}
-                              className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Summary Footer */}
-            {restaurantOrders.length > 0 && restaurantSummary && (
-              <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 p-6">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                    <span>Subtotal</span>
-                    <span className="font-medium">{formatCurrency(restaurantSummary.subtotal)}</span>
-                  </div>
-                  {settings?.service_charge_percentage > 0 && (
-                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                      <span>Service Charge ({settings.service_charge_percentage}%)</span>
-                      <span className="font-medium">{formatCurrency(restaurantSummary.serviceCharge)}</span>
-                    </div>
-                  )}
-                  {settings?.vat_percentage > 0 && (
-                    <div className="flex items-center justify-between text-slate-500 dark:text-gray-400">
-                      <span>VAT ({settings.vat_percentage}%)</span>
-                      <span className="font-medium">{formatCurrency(restaurantSummary.vat)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <span className="text-slate-900 dark:text-white font-bold text-xl">Grand Total</span>
-                    <span className="text-primary-400 font-bold text-2xl">
-                      {formatCurrency(restaurantSummary.grandTotal)}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-3 mt-4">
-                    <button
-                      onClick={handlePrintKitchenBill}
-                      className="btn-secondary flex items-center justify-center space-x-2 py-3"
-                    >
-                      <ChefHat size={18} />
-                      <span>Kitchen</span>
-                    </button>
-                    <button
-                      onClick={handlePrintReceptionBill}
-                      className="btn-secondary flex items-center justify-center space-x-2 py-3"
-                    >
-                      <Receipt size={18} />
-                      <span>Reception</span>
-                    </button>
-                    <button
-                      onClick={handleCompleteTableBill}
-                      className="btn-primary flex items-center justify-center space-x-2 py-3"
-                    >
-                      <CheckCircle size={18} />
-                      <span>Complete</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Manage Restaurant Items Modal */}
-      {showManageRestaurantItems && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Manage Restaurant Items</h2>
-                <button
-                  onClick={() => {
-                    setShowManageRestaurantItems(false)
-                    resetNewRestaurantItem()
-                  }}
-                  className="p-2 hover:bg-slate-100 dark:bg-slate-800 rounded-lg transition-colors"
-                >
-                  <X size={20} className="text-slate-500 dark:text-gray-400" />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-              {/* Add/Edit Item Form */}
-              {canManageFBItems() && (
-                <form onSubmit={handleSaveRestaurantItem} className="mb-6 p-6 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                  <h3 className="text-slate-900 dark:text-white font-semibold mb-4">
-                    {editingRestaurantItem ? 'Edit Item' : 'Add New Item'}
-                  </h3>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="label">Item Name *</label>
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <label className="label">Item Name</label>
                       <input
                         type="text"
-                        value={newRestaurantItem.item_name}
-                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, item_name: e.target.value })}
+                        value={activeTab === 'room-service' ? roomItemSearch : restaurantItemSearch}
+                        onChange={(e) => {
+                          if(activeTab === 'room-service') { setRoomItemSearch(e.target.value); setShowRoomItemDropdown(true) }
+                          else { setRestaurantItemSearch(e.target.value); setShowRestaurantItemDropdown(true) }
+                        }}
+                        onFocus={() => {
+                          if(activeTab === 'room-service') setShowRoomItemDropdown(true)
+                          else setShowRestaurantItemDropdown(true)
+                        }}
                         className="input-field"
-                        placeholder="e.g., Chicken Fried Rice"
-                        required
+                        placeholder="Search menu..."
                       />
+                      
+                      {/* Dropdown Results */}
+                      {((activeTab === 'room-service' && showRoomItemDropdown) || (activeTab === 'restaurant' && showRestaurantItemDropdown)) && (
+                        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 max-h-64 overflow-y-auto">
+                          {(activeTab === 'room-service' 
+                            ? [...menuItems, ...restaurantItems] // Combine for room service
+                            : restaurantItems
+                          )
+                             .filter(i => {
+                              const search = activeTab === 'room-service' ? roomItemSearch : restaurantItemSearch
+                              const itemName = (i.item_name || '').trim()
+                              
+                              const isAvail = activeTab === 'room-service' 
+                                ? (i.is_active !== false && i.is_available !== false) 
+                                : i.is_available !== false
+                              
+                              if (!search) return isAvail
+                              return isAvail && itemName.toLowerCase().includes(search.toLowerCase().trim())
+                            })
+                            // Deduplicate by name if searching multiple sources
+                            .filter((item, index, self) => 
+                              index === self.findIndex((t) => (t.item_name || '').trim().toLowerCase() === (item.item_name || '').trim().toLowerCase())
+                            )
+                            .map(item => (
+                              <button
+                                key={item.id}
+                                onClick={() => {
+                                  if(activeTab === 'room-service') {
+                                    setNewItem({...newItem, item_id: item.id, item_name: item.item_name, category: item.category?.name || item.category || 'Food', unit_price: item.unit_price})
+                                    setRoomItemSearch(item.item_name); setShowRoomItemDropdown(false)
+                                  } else {
+                                    setNewRestaurantOrder({...newRestaurantOrder, item_id: item.id, item_name: item.item_name, unit_price: item.unit_price})
+                                    setRestaurantItemSearch(item.item_name); setShowRestaurantItemDropdown(false)
+                                  }
+                                }}
+                                className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-left"
+                              >
+                                <div>
+                                  <p className="font-medium text-slate-900 dark:text-white">{item.item_name}</p>
+                                  <p className="text-xs text-slate-400 capitalize">
+                                    {(item.category?.name || item.category || 'General').replace('_', ' ')}
+                                  </p>
+                                </div>
+                                <p className="font-bold text-primary-600">{formatCurrency(item.unit_price)}</p>
+                              </button>
+                            ))}
+                        </div>
+                      )}
                     </div>
 
-                    <div>
-                      <label className="label">Category *</label>
-                      <select
-                        value={newRestaurantItem.category}
-                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, category: e.target.value })}
-                        className="input-field"
-                        required
-                      >
-                        <option value="main_course">Main Course</option>
-                        <option value="appetizer">Appetizer</option>
-                        <option value="dessert">Dessert</option>
-                        <option value="beverage">Beverage</option>
-                        <option value="special">Special</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label">Quantity</label>
+                        <input
+                          type="number"
+                          value={activeTab === 'room-service' ? newItem.quantity : newRestaurantOrder.quantity}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 1
+                            if(activeTab === 'room-service') setNewItem({...newItem, quantity: val})
+                            else setNewRestaurantOrder({...newRestaurantOrder, quantity: val})
+                          }}
+                          className="input-field"
+                        />
+                      </div>
+                      <div>
+                        <label className="label">Total</label>
+                        <div className="input-field bg-slate-50 dark:bg-slate-800 font-bold text-slate-600 dark:text-gray-300">
+                          {formatCurrency((activeTab === 'room-service' ? newItem.quantity * newItem.unit_price : newRestaurantOrder.quantity * newRestaurantOrder.unit_price))}
+                        </div>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="label">Unit Price (LKR) *</label>
-                      <input
-                        type="number"
-                        value={newRestaurantItem.unit_price}
-                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, unit_price: parseFloat(e.target.value) || 0 })}
-                        className="input-field"
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">Availability</label>
-                      <select
-                        value={newRestaurantItem.is_available ? 'true' : 'false'}
-                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, is_available: e.target.value === 'true' })}
-                        className="input-field"
-                      >
-                        <option value="true">Available</option>
-                        <option value="false">Not Available</option>
-                      </select>
-                    </div>
-
-                    <div className="col-span-2">
-                      <label className="label">Description</label>
-                      <textarea
-                        value={newRestaurantItem.description}
-                        onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, description: e.target.value })}
-                        className="input-field"
-                        rows="2"
-                        placeholder="Brief description of the item..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-3 mt-4">
-                    {editingRestaurantItem && (
-                      <button
-                        type="button"
-                        onClick={resetNewRestaurantItem}
-                        className="btn-secondary"
-                      >
-                        Cancel Edit
-                      </button>
-                    )}
-                    <button type="submit" className="btn-primary flex items-center space-x-2">
-                      <Save size={18} />
-                      <span>{editingRestaurantItem ? 'Update Item' : 'Add Item'}</span>
+                    <button 
+                      onClick={activeTab === 'room-service' ? handleAddItem : handleAddRestaurantOrder}
+                      className="btn-primary w-full"
+                    >
+                      Add to Order
                     </button>
                   </div>
-                </form>
+                </div>
               )}
 
-              {/* Items Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-700">
-                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Item Name</th>
-                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Category</th>
-                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Price</th>
-                      <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Status</th>
-                      {canManageFBItems() && (
-                        <th className="text-left py-3 px-4 text-slate-500 dark:text-gray-400 font-medium text-sm">Actions</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {restaurantItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={canManageFBItems() ? "5" : "4"} className="text-center py-8 text-gray-500">
-                          No items found
-                        </td>
-                      </tr>
-                    ) : (
-                      restaurantItems.map(item => (
-                        <tr key={item.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50">
-                          <td className="py-4 px-4">
-                            <div className="text-slate-900 dark:text-white font-medium">{item.item_name}</div>
-                            {item.description && (
-                              <div className="text-xs text-gray-500 mt-1">{item.description}</div>
-                            )}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className="px-2 py-1 bg-primary-600/20 text-primary-400 rounded text-xs">
-                              {item.category.replace('_', ' ').toUpperCase()}
-                            </span>
-                          </td>
-                          <td className="py-4 px-4 text-primary-400 font-bold">
-                            {formatCurrency(item.unit_price)}
-                          </td>
-                          <td className="py-4 px-4">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              item.is_available
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
-                            }`}>
-                              {item.is_available ? 'Available' : 'Not Available'}
-                            </span>
-                          </td>
-                          {canManageFBItems() && (
-                            <td className="py-4 px-4">
-                              <div className="flex items-center space-x-2">
-                                <button
-                                  onClick={() => {
-                                    setEditingRestaurantItem(item)
-                                    setNewRestaurantItem({
-                                      item_name: item.item_name,
-                                      category: item.category,
-                                      unit_price: item.unit_price,
-                                      description: item.description || '',
-                                      is_available: item.is_available
-                                    })
-                                  }}
-                                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-primary-400 transition-colors"
-                                >
-                                  <Edit2 size={18} />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteRestaurantItem(item.id)}
-                                  className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-red-400 transition-colors"
-                                >
-                                  <Trash2 size={18} />
-                                </button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      ))
+              {/* Order Items List */}
+              <div className="space-y-2">
+                {(activeTab === 'room-service' ? consumptions : restaurantOrders).map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-medium text-slate-900 dark:text-white truncate">{item.item_name}</h5>
+                        <p className="font-bold text-primary-600 whitespace-nowrap ml-2">{formatCurrency(item.total_price)}</p>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+                        {formatCurrency(item.unit_price)} × {item.quantity} · {item.category || 'Food'}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => activeTab === 'room-service' ? handleUpdateQuantity(item.id, item.quantity - 1) : handleUpdateOrderQuantity(item.id, item.quantity - 1)}
+                        className="w-7 h-7 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 font-bold"
+                      >-</button>
+                      <span className="w-6 text-center text-sm font-medium text-slate-900 dark:text-white">{item.quantity}</span>
+                      <button 
+                        onClick={() => activeTab === 'room-service' ? handleUpdateQuantity(item.id, item.quantity + 1) : handleUpdateOrderQuantity(item.id, item.quantity + 1)}
+                        className="w-7 h-7 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 font-bold"
+                      >+</button>
+                      <button 
+                        onClick={() => activeTab === 'room-service' ? handleDeleteItem(item.id) : handleDeleteOrder(item.id)}
+                        className="p-1.5 text-red-400 hover:bg-red-500/20 rounded-lg ml-1"
+                      ><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                ))}
+                
+                {(activeTab === 'room-service' ? consumptions : restaurantOrders).length === 0 && (
+                  <div className="py-12 text-center">
+                    <ShoppingCart size={40} className="mx-auto mb-3 text-slate-300 dark:text-slate-600" />
+                    <p className="text-slate-500 dark:text-gray-400 text-sm">No items in order</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Summary Footer */}
+            {(activeTab === 'room-service' ? consumptions : restaurantOrders).length > 0 && (
+              <div className="p-6 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm text-slate-500 dark:text-gray-400">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency((activeTab === 'room-service' ? summary.subtotal : restaurantSummary.subtotal))}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-500 dark:text-gray-400">
+                    <span>Tax & Charges</span>
+                    <span>{formatCurrency(((activeTab === 'room-service' ? summary.vat + summary.serviceCharge : restaurantSummary.vat + restaurantSummary.serviceCharge)))}</span>
+                  </div>
+                  <div className="flex justify-between items-end pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <span className="font-bold text-lg text-slate-900 dark:text-white">Grand Total</span>
+                    <span className="font-bold text-2xl text-primary-600">
+                      {formatCurrency((activeTab === 'room-service' ? summary.grandTotal : restaurantSummary.grandTotal))}
+                    </span>
+                  </div>
+                </div>
+
+                {activeTab === 'room-service' ? (
+                  <button 
+                    onClick={handleAddToRoomBill}
+                    className="btn-primary w-full py-3"
+                  >
+                    Transfer to Guest Folio
+                  </button>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3">
+                    <button onClick={handlePrintKitchenBill} className="btn-secondary flex flex-col items-center gap-1.5 py-3 text-xs">
+                      <ChefHat size={18} className="text-primary-400" /> Kitchen
+                    </button>
+                    <button onClick={handlePrintReceptionBill} className="btn-secondary flex flex-col items-center gap-1.5 py-3 text-xs">
+                      <Receipt size={18} className="text-primary-400" /> Bill
+                    </button>
+                    <button onClick={handleCompleteTableBill} className="btn-primary flex flex-col items-center gap-1.5 py-3 text-xs">
+                      <CheckCircle size={18} /> Settle
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Menu Management Modal */}
+      {showManageRestaurantItems && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+                  <Utensils size={22} className="text-primary-400" />
+                  <span>Menu Management</span>
+                </h2>
+                <button 
+                  onClick={() => { setShowManageRestaurantItems(false); resetNewRestaurantItem() }}
+                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                ><X size={20} className="text-slate-500 dark:text-gray-400" /></button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Add/Edit Form */}
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+                  {editingRestaurantItem ? 'Edit Menu Item' : 'Add New Item'}
+                </h3>
+                
+                <form onSubmit={handleSaveRestaurantItem} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">Item Name *</label>
+                    <input
+                      type="text"
+                      value={newRestaurantItem.item_name}
+                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, item_name: e.target.value })}
+                      className="input-field"
+                      placeholder="e.g., Chicken Fried Rice"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Category</label>
+                    <select
+                      value={newRestaurantItem.category}
+                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, category: e.target.value })}
+                      className="input-field"
+                    >
+                      <option value="main_course">Main Course</option>
+                      <option value="appetizer">Appetizer</option>
+                      <option value="dessert">Dessert</option>
+                      <option value="beverage">Beverage</option>
+                      <option value="special">Special</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">Price (LKR) *</label>
+                    <input
+                      type="number"
+                      value={newRestaurantItem.unit_price}
+                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, unit_price: parseFloat(e.target.value) || 0 })}
+                      className="input-field"
+                      min="0"
+                      step="0.01"
+                      required
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="label">Description</label>
+                    <input
+                      type="text"
+                      value={newRestaurantItem.description}
+                      onChange={(e) => setNewRestaurantItem({ ...newRestaurantItem, description: e.target.value })}
+                      className="input-field"
+                      placeholder="Brief description..."
+                    />
+                  </div>
+
+                  <div className="flex items-end space-x-3">
+                    <button type="submit" className="btn-primary flex items-center space-x-2">
+                      <Save size={18} />
+                      <span>{editingRestaurantItem ? 'Save Changes' : 'Add Item'}</span>
+                    </button>
+                    {editingRestaurantItem && (
+                      <button type="button" onClick={resetNewRestaurantItem} className="btn-secondary">
+                        Cancel
+                      </button>
                     )}
-                  </tbody>
-                </table>
+                  </div>
+                </form>
+              </div>
+
+              {/* Items List */}
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Current Menu Items</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Deduplicate displayed items by trimmed name to avoid visual duplicates from DB */}
+                  {Array.from(new Map(restaurantItems.map(item => [(item.item_name || '').trim().toLowerCase(), item])).values())
+                    .sort((a, b) => (a.item_name || '').localeCompare(b.item_name || ''))
+                    .map(item => (
+                      <div key={item.id} className="card p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-slate-900 dark:text-white truncate">{item.item_name}</h4>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 capitalize">{item.category.replace('_', ' ')}</p>
+                            {item.description && <p className="text-xs text-slate-400 italic truncate mt-1">{item.description}</p>}
+                          </div>
+                          <p className="font-bold text-primary-600 text-lg ml-2">{formatCurrency(item.unit_price)}</p>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                            item.is_available 
+                              ? 'bg-green-500/20 text-green-400' 
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            {item.is_available ? 'Available' : 'Out of Stock'}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button 
+                              onClick={() => {
+                                setEditingRestaurantItem(item)
+                                setNewRestaurantItem({ item_name: item.item_name, category: item.category, unit_price: item.unit_price, description: item.description || '', is_available: item.is_available })
+                              }}
+                              className="p-2 hover:bg-primary-600/20 rounded-lg text-primary-400 transition-colors"
+                            ><Edit2 size={16} /></button>
+                            <button 
+                              onClick={() => handleDeleteRestaurantItem(item.id)}
+                              className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
+                            ><Trash2 size={16} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1801,3 +1492,4 @@ export default function FoodBeverage() {
     </div>
   )
 }
+

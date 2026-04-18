@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logActivity } from '../lib/activityLogger'
 import {
   Users,
   Plus,
@@ -145,6 +146,15 @@ export default function UserManagement() {
 
       if (profileError) throw profileError
 
+      // Log activity
+      await logActivity(
+        userProfile,
+        'create',
+        'user',
+        `Created new user: ${newUser.full_name} (${newUser.role})`,
+        authData.user.id
+      )
+
       showNotif(`User "${newUser.full_name}" created successfully`)
       resetForm()
       loadUsers()
@@ -170,6 +180,15 @@ export default function UserManagement() {
 
       if (error) throw error
 
+      // Log activity
+      await logActivity(
+        userProfile,
+        'update',
+        'user',
+        `${!currentStatus ? 'Activated' : 'Deactivated'} user: ${users.find(u => u.id === userId)?.full_name}`,
+        userId
+      )
+
       showNotif(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`)
       loadUsers()
     } catch (error) {
@@ -194,6 +213,15 @@ export default function UserManagement() {
         .eq('id', userId)
 
       if (error) throw error
+
+      // Log activity
+      await logActivity(
+        userProfile,
+        'delete',
+        'user',
+        `Deleted user: ${userName}`,
+        userId
+      )
 
       showNotif(`User "${userName}" deleted successfully`)
       loadUsers()

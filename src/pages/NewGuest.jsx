@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
+import { logActivity } from '../lib/activityLogger'
 import { generateGRCNumber } from '../utils/grcGenerator'
 import { calculateRoomCharges, formatCurrency } from '../utils/calculations'
 import { format, differenceInDays } from 'date-fns'
@@ -8,6 +10,7 @@ import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 
 
 export default function NewGuest() {
   const navigate = useNavigate()
+  const { userProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [allRooms, setAllRooms] = useState([])
   const [availableRooms, setAvailableRooms] = useState([])
@@ -525,6 +528,19 @@ export default function NewGuest() {
         .single()
 
       if (guestError) throw guestError
+      
+      // Log activity
+      const activityDesc = registrationType === 'checkin' 
+        ? `Checked in guest ${formData.name_with_initials} (GRC: ${grcNumber}) to Room(s): ${formData.room_numbers.join(', ')}`
+        : `Created ${registrationType.replace('_', ' ')} for ${formData.name_with_initials} (GRC: ${grcNumber}) for Room(s): ${formData.room_numbers.join(', ')}`
+      
+      await logActivity(
+        userProfile, 
+        registrationType === 'checkin' ? 'create' : 'create', 
+        'booking', 
+        activityDesc, 
+        guest.id
+      )
 
       if (registrationType === 'checkin') {
         for (const roomNumber of formData.room_numbers) {

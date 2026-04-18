@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { logActivity } from '../lib/activityLogger'
 import {
   Settings,
   Power,
@@ -88,6 +89,15 @@ export default function SystemSettings() {
         .eq('id', 1)
 
       if (error) throw error
+
+      // Log activity
+      await logActivity(
+        userProfile,
+        'update',
+        'system',
+        `${newStatus ? 'Activated' : 'Deactivated'} the hotel management system`,
+        '1'
+      )
 
       showNotif(
         newStatus

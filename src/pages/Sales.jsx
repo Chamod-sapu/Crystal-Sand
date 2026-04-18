@@ -19,6 +19,8 @@ import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, pars
 
 const PERIOD_OPTIONS = [
   { label: 'Today', value: 'today' },
+  { label: 'Yesterday', value: 'yesterday' },
+  { label: 'Last 3 Days', value: '3days' },
   { label: 'Last 7 Days', value: '7days' },
   { label: 'Last 30 Days', value: '30days' },
   { label: 'This Month', value: 'month' },
@@ -31,6 +33,11 @@ function getPeriodDates(period, customFrom, customTo) {
   switch (period) {
     case 'today':
       return { from: format(now, 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+    case 'yesterday':
+      const yesterday = subDays(now, 1)
+      return { from: format(yesterday, 'yyyy-MM-dd'), to: format(yesterday, 'yyyy-MM-dd') }
+    case '3days':
+      return { from: format(subDays(now, 2), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
     case '7days':
       return { from: format(subDays(now, 6), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
     case '30days':
@@ -42,7 +49,7 @@ function getPeriodDates(period, customFrom, customTo) {
     case 'custom':
       return { from: customFrom, to: customTo }
     default:
-      return { from: format(subDays(now, 29), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+      return { from: format(now, 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
   }
 }
 
@@ -70,7 +77,7 @@ function StatCard({ title, value, icon: Icon, color, sub, trend }) {
 }
 
 export default function Sales() {
-  const [period, setPeriod] = useState('30days')
+  const [period, setPeriod] = useState('today')
   const [customFrom, setCustomFrom] = useState(format(subDays(new Date(), 29), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
@@ -260,14 +267,17 @@ export default function Sales() {
 
       {/* Custom Range Picker */}
       {period === 'custom' && (
-        <div className="card p-4 flex items-center space-x-4">
-          <Filter size={18} className="text-primary-400 flex-shrink-0" />
-          <div className="flex items-center space-x-3">
-            <div>
+        <div className="card p-4 flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="flex items-center space-x-2">
+            <Filter size={18} className="text-primary-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-slate-700 dark:text-gray-300">Custom Filter</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+            <div className="flex-1 sm:flex-none">
               <label className="label">From</label>
               <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="input-field" />
             </div>
-            <div>
+            <div className="flex-1 sm:flex-none">
               <label className="label">To</label>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="input-field" />
             </div>
