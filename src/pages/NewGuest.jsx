@@ -11,6 +11,7 @@ export default function NewGuest() {
   const [loading, setLoading] = useState(false)
   const [allRooms, setAllRooms] = useState([])
   const [availableRooms, setAvailableRooms] = useState([])
+  const [allRoomsWithStatus, setAllRoomsWithStatus] = useState([])
   const [guests, setGuests] = useState([])
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
@@ -334,9 +335,7 @@ export default function NewGuest() {
     setError('')
 
     try {
-      const roomsByType = allRooms.filter(room => room.room_type === formData.room_type)
-
-      const roomsWithStatus = roomsByType.map(room => {
+      const roomsWithStatus = allRooms.map(room => {
         const conflicts = checkTimeConflict(
           room.room_number,
           formData.date_of_arrival,
@@ -344,22 +343,32 @@ export default function NewGuest() {
           formData.time_of_arrival,
           formData.time_of_departure
         )
+        
+        const isConflict = conflicts.length > 0
+        const isDBOccupied = room.status === 'occupied' || room.status === 'maintenance'
+        
+        // Consider it occupied if there's a conflict OR if it's currently occupied/maintenance in the DB and arrival is today
+        const today = format(new Date(), 'yyyy-MM-dd')
+        const isArrivalToday = formData.date_of_arrival === today
+
         return {
           ...room,
-          isOccupied: conflicts.length > 0
+          isOccupied: isConflict || (isDBOccupied && isArrivalToday)
         }
-      })
-
-      const sortedRooms = roomsWithStatus.sort((a, b) => {
+      }).sort((a, b) => {
         const numA = parseInt(a.room_number.replace(/\D/g, ''))
         const numB = parseInt(b.room_number.replace(/\D/g, ''))
         return numA - numB
       })
 
-      setAvailableRooms(sortedRooms)
+      setAllRoomsWithStatus(roomsWithStatus)
+
+      const roomsByType = roomsWithStatus.filter(room => room.room_type === formData.room_type)
+      setAvailableRooms(roomsByType)
     } catch (err) {
       console.error('Error in updateAvailableRooms:', err)
       setAvailableRooms([])
+      setAllRoomsWithStatus([])
     }
   }
 
@@ -1140,6 +1149,61 @@ export default function NewGuest() {
               )}
             </div>
           </div>
+          
+          {/* All Rooms Status Overview */}
+          {formData.date_of_arrival && formData.date_of_departure && allRoomsWithStatus.length > 0 && (
+            <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">All Rooms Occupancy Overview</h3>
+                <div className="flex items-center space-x-4 text-[10px] uppercase tracking-wider font-bold">
+                  <div className="flex items-center space-x-1.5">
+                    <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500"></div>
+                    <span className="text-green-500">Available</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500"></div>
+                    <span className="text-red-500">Occupied</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <div className="w-3 h-3 rounded border-2 border-primary-600 bg-primary-600/20"></div>
+                    <span className="text-primary-500">Selected</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
+                {allRoomsWithStatus.map(room => {
+                  const isSelected = formData.room_numbers.includes(room.room_number)
+                  const isCorrectType = room.room_type === formData.room_type
+                  
+                  return (
+                    <div
+                      key={room.id}
+                      className={`p-2 rounded border text-center transition-all ${
+                        isSelected
+                          ? 'border-primary-600 bg-primary-600/20 ring-1 ring-primary-600'
+                          : room.isOccupied
+                          ? 'border-red-500/50 bg-red-500/10 opacity-70'
+                          : 'border-green-500/50 bg-green-500/10'
+                      } ${!isCorrectType && !isSelected && !room.isOccupied ? 'grayscale-[0.5]' : ''}`}
+                    >
+                      <div className={`font-bold text-sm ${
+                        isSelected ? 'text-primary-400' : room.isOccupied ? 'text-red-400' : 'text-green-400'
+                      }`}>
+                        {room.room_number}
+                      </div>
+                      <div className="text-[8px] opacity-60 font-medium">
+                        {room.room_type}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-3 italic">
+                * This overview shows the real-time status of all rooms for the selected period. Red rooms are already booked or occupied.
+              </p>
+            </div>
+          )}
 
         </div>
 
