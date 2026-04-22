@@ -16,6 +16,7 @@ export default function NewGuest() {
   const [availableRooms, setAvailableRooms] = useState([])
   const [allRoomsWithStatus, setAllRoomsWithStatus] = useState([])
   const [guests, setGuests] = useState([])
+  const [roomTypes, setRoomTypes] = useState([])
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
   const [uploadedFile, setUploadedFile] = useState(null)
@@ -74,7 +75,6 @@ export default function NewGuest() {
     reservation_number: '',
     voucher_number: '',
     room_numbers: [],
-    room_type: 'DBL',
     number_of_rooms: 1,
     number_of_adults: 2,
     number_of_children: 0,
@@ -99,7 +99,7 @@ export default function NewGuest() {
 
   useEffect(() => {
     updateAvailableRooms()
-  }, [formData.room_type, formData.date_of_arrival, formData.date_of_departure, formData.time_of_arrival, formData.time_of_departure, allRooms, guests])
+  }, [formData.date_of_arrival, formData.date_of_departure, formData.time_of_arrival, formData.time_of_departure, allRooms, guests])
 
   useEffect(() => {
     if (formData.mobile_number) {
@@ -127,8 +127,13 @@ export default function NewGuest() {
 
       if (guestsError) throw guestsError
 
+      const { data: typesData } = await supabase
+        .from('room_types')
+        .select('*')
+
       setAllRooms(roomsData || [])
       setGuests(guestsData || [])
+      setRoomTypes(typesData || [])
     } catch (error) {
       console.error('Error loading data:', error)
       setError('Failed to load data. Please refresh the page.')
@@ -365,15 +370,15 @@ export default function NewGuest() {
       })
 
       setAllRoomsWithStatus(roomsWithStatus)
-
-      const roomsByType = roomsWithStatus.filter(room => room.room_type === formData.room_type)
-      setAvailableRooms(roomsByType)
+      setAvailableRooms(roomsWithStatus)
     } catch (err) {
       console.error('Error in updateAvailableRooms:', err)
       setAvailableRooms([])
       setAllRoomsWithStatus([])
     }
   }
+
+  const roomTypeMap = Object.fromEntries(roomTypes.map(rt => [rt.code, rt.name]))
 
   const handleChange = (e) => {
     const { name, value, type } = e.target
@@ -487,7 +492,7 @@ export default function NewGuest() {
       const uniqueTypes = [...new Set(selectedRooms.map(r => r.room_type))].sort()
       const typeSummary = uniqueTypes.length > 1 
         ? `Mixed (${uniqueTypes.join(', ')})` 
-        : uniqueTypes[0] || formData.room_type
+        : uniqueTypes[0] || 'Unknown'
 
       const totalRoomCharge = selectedRooms.reduce((total, room) => {
         const roomCharge = calculateRoomCharges(
@@ -994,40 +999,7 @@ export default function NewGuest() {
             <span>Room Selection</span>
           </h2>
           
-          <div className="mb-6">
-            <label className="label">Room Type <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
-              {[
-                { code: 'SGL', name: 'Single', desc: '1 Adult', maxAdults: 1, maxChildren: 0 },
-                { code: 'DBL', name: 'Double', desc: '2 Adults', maxAdults: 2, maxChildren: 1 },
-                { code: 'TPL', name: 'Triple', desc: '3 Adults', maxAdults: 3, maxChildren: 2 },
-                { code: 'QUAD', name: 'Quad', desc: '4 Adults', maxAdults: 4, maxChildren: 2 },
-                { code: 'FAMILY', name: 'Family 5 Pax', desc: '4+3 Children', maxAdults: 4, maxChildren: 3 },
-                { code: '6PAX', name: '6 Pax', desc: '6+3 Children', maxAdults: 6, maxChildren: 3 }
-              ].map(type => (
-                <button
-                  key={type.code}
-                  type="button"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev, 
-                      room_type: type.code
-                    }))
-                  }}
-                  className={`p-4 rounded-lg border-2 transition-all text-center ${
-                    formData.room_type === type.code
-                      ? 'border-primary-600 bg-primary-600/10 text-primary-700 dark:text-white'
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-600 text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:bg-slate-800'
-                  }`}
-                  disabled={loading}
-                >
-                  <div className="font-bold text-lg">{type.code}</div>
-                  <div className="text-xs mt-1">{type.name}</div>
-                  <div className="text-xs opacity-75">{type.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -1060,7 +1032,7 @@ export default function NewGuest() {
             ) : availableRooms.length > 0 ? (
               <>
                 <p className="text-sm text-gray-500 mb-3">
-                  Showing all {availableRooms.length} {formData.room_type} room(s). Available rooms can be selected.
+                  Showing all {availableRooms.length} room(s). Available rooms can be selected.
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {availableRooms.map(room => (
@@ -1078,7 +1050,8 @@ export default function NewGuest() {
                       disabled={loading || room.isOccupied}
                     >
                       <div className="font-bold text-lg">{room.room_number}</div>
-                      <div className="text-xs mt-1">Floor {room.floor || 1}</div>
+                      <div className="text-[10px] font-bold text-primary-500 uppercase tracking-wider mb-1">{roomTypeMap[room.room_type] || room.room_type}</div>
+                      <div className="text-xs">Floor {room.floor || 1}</div>
                       <div className="text-xs opacity-75 mt-1">
                         LKR {room.base_price?.toLocaleString() || '0'}
                       </div>
@@ -1100,10 +1073,10 @@ export default function NewGuest() {
               <div className="card p-6 text-center">
                 <div className="text-red-400 mb-2">
                   <AlertCircle className="inline mr-2" size={20} />
-                  No available {formData.room_type} rooms for the selected time period
+                  No available rooms for the selected time period
                 </div>
                 <p className="text-sm text-gray-500">
-                  Try adjusting your dates/times or selecting a different room type
+                  Try adjusting your dates/times
                 </p>
               </div>
             )}
@@ -1166,60 +1139,7 @@ export default function NewGuest() {
             </div>
           </div>
           
-          {/* All Rooms Status Overview */}
-          {formData.date_of_arrival && formData.date_of_departure && allRoomsWithStatus.length > 0 && (
-            <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">All Rooms Occupancy Overview</h3>
-                <div className="flex items-center space-x-4 text-[10px] uppercase tracking-wider font-bold">
-                  <div className="flex items-center space-x-1.5">
-                    <div className="w-3 h-3 rounded bg-green-500/20 border border-green-500"></div>
-                    <span className="text-green-500">Available</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <div className="w-3 h-3 rounded bg-red-500/20 border border-red-500"></div>
-                    <span className="text-red-500">Occupied</span>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <div className="w-3 h-3 rounded border-2 border-primary-600 bg-primary-600/20"></div>
-                    <span className="text-primary-500">Selected</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
-                {allRoomsWithStatus.map(room => {
-                  const isSelected = formData.room_numbers.includes(room.room_number)
-                  const isCorrectType = room.room_type === formData.room_type
-                  
-                  return (
-                    <div
-                      key={room.id}
-                      className={`p-2 rounded border text-center transition-all ${
-                        isSelected
-                          ? 'border-primary-600 bg-primary-600/20 ring-1 ring-primary-600'
-                          : room.isOccupied
-                          ? 'border-red-500/50 bg-red-500/10 opacity-70'
-                          : 'border-green-500/50 bg-green-500/10'
-                      } ${!isCorrectType && !isSelected && !room.isOccupied ? 'grayscale-[0.5]' : ''}`}
-                    >
-                      <div className={`font-bold text-sm ${
-                        isSelected ? 'text-primary-400' : room.isOccupied ? 'text-red-400' : 'text-green-400'
-                      }`}>
-                        {room.room_number}
-                      </div>
-                      <div className="text-[8px] opacity-60 font-medium">
-                        {room.room_type}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="text-[10px] text-gray-500 mt-3 italic">
-                * This overview shows the real-time status of all rooms for the selected period. Red rooms are already booked or occupied.
-              </p>
-            </div>
-          )}
+
 
         </div>
 

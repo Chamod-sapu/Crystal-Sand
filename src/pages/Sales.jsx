@@ -16,6 +16,7 @@ import {
   Filter
 } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns'
+import XLSX from 'xlsx-js-style'
 
 const PERIOD_OPTIONS = [
   { label: 'Today', value: 'today' },
@@ -217,6 +218,356 @@ export default function Sales() {
     }
   }
 
+  const exportSalesData = async () => {
+    setLoading(true)
+    try {
+      const { from, to } = getPeriodDates(period, customFrom, customTo)
+      const toInclusive = to + 'T23:59:59'
+      const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
+      const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
+
+      // ── Fetch data ──────────────────────────────────────────────────────────
+      const { data: guestsData } = await supabase
+        .from('guests')
+        .select('id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure')
+        .gte('date_of_departure', from)
+        .lte('date_of_departure', to)
+        .eq('status', 'checked_out')
+
+      const { data: fbData } = await supabase
+        .from('fb_consumption')
+        .select('total_price, item_name, quantity, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
+        .gte('consumed_at', from)
+        .lte('consumed_at', toInclusive)
+
+      const { data: restoData } = await supabase
+        .from('restaurant_orders')
+        .select('total_price, item_name, quantity')
+        .gte('created_at', from)
+        .lte('created_at', toInclusive)
+
+      const { data: extraData } = await supabase
+        .from('purchases')
+        .select('total_price, item_name, category, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
+        .gte('purchase_date', from)
+        .lte('purchase_date', toInclusive)
+
+      // ── Colour palette ───────────────────────────────────────────────────────
+      // Deep navy (header bg)
+      const NAVY    = { rgb: '1E293B' }
+      // Accent teal
+      const TEAL    = { rgb: '0891B2' }
+      // Soft teal for sub-headers
+      const TEAL_LT = { rgb: 'CFFAFE' }
+      // Amber for F&B
+      const AMBER   = { rgb: 'D97706' }
+      const AMB_LT  = { rgb: 'FEF3C7' }
+      // Green for extra
+      const GREEN   = { rgb: '059669' }
+      const GRN_LT  = { rgb: 'D1FAE5' }
+      // Alternating row bg
+      const ROW_ALT = { rgb: 'F1F5F9' }
+      // Total row
+      const TOTAL_BG = { rgb: '1E293B' }
+      const WHITE   = { rgb: 'FFFFFF' }
+      const DARK    = { rgb: '0F172A' }
+
+      // ── Helper: style cell ─────────────────────────────────────────────────
+      const cell = (v, opts = {}) => {
+        const {
+          bold = false,
+          italic = false,
+          sz = 11,
+          fgColor = null,
+          bgColor = null,
+          halign = 'left',
+          numFmt = null,
+          wrap = false,
+          border = false,
+        } = opts
+        const c = { v, t: typeof v === 'number' ? 'n' : 's' }
+        if (numFmt) { c.t = 'n'; c.z = numFmt }
+        c.s = {
+          font: { name: 'Calibri', sz, bold, italic, color: fgColor || DARK },
+          alignment: { horizontal: halign, vertical: 'center', wrapText: wrap },
+          ...(bgColor ? { fill: { patternType: 'solid', fgColor: bgColor } } : {}),
+          ...(border ? {
+            border: {
+              top:    { style: 'thin', color: { rgb: 'CBD5E1' } },
+              bottom: { style: 'thin', color: { rgb: 'CBD5E1' } },
+              left:   { style: 'thin', color: { rgb: 'CBD5E1' } },
+              right:  { style: 'thin', color: { rgb: 'CBD5E1' } },
+            }
+          } : {}),
+        }
+        return c
+      }
+
+      // ── Helper: blank cell ─────────────────────────────────────────────────
+      const blank = (bgColor = null, border = false) => cell('', { bgColor, border })
+
+      // ── Helper: build a styled sheet ──────────────────────────────────────
+      const buildSheet = (rows, cols, dataStartRow) => {
+        const ws = {}
+        rows.forEach((row, ri) => {
+          row.forEach((c, ci) => {
+            if (c == null) return
+            const addr = XLSX.utils.encode_cell({ r: ri, c: ci })
+            ws[addr] = c
+          })
+        })
+        ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: cols.length - 1 } })
+        ws['!cols'] = cols
+        return ws
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // SHEET 1 — COVER / SUMMARY
+      // ═══════════════════════════════════════════════════════════════════════
+      const totalRooms = (guestsData || []).reduce((s, g) => s + parseFloat(g.total_room_charge || 0), 0)
+      const totalFB    = [...(fbData || []), ...(restoData || [])].reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
+      const totalExtra = (extraData || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
+      const grandTotal = totalRooms + totalFB + totalExtra
+
+      const fmt = '#,##0.00'
+      const coverRows = [
+        // Row 0 – logo / title span
+        [cell('CRYSTAL SANDS', { bold: true, sz: 22, bgColor: NAVY, fgColor: WHITE, halign: 'center' }), null, null, null, null, null],
+        [cell('Sales Revenue Report', { bold: false, sz: 13, bgColor: NAVY, fgColor: { rgb: '94A3B8' }, halign: 'center' }), null, null, null, null, null],
+        [blank(NAVY), null, null, null, null, null],
+        // Row 3 – meta
+        [cell('Period', { bold: true, sz: 11, bgColor: TEAL_LT, border: true }), cell(periodLabel, { sz: 11, halign: 'center', border: true }), blank(), blank(), blank(), blank()],
+        [cell('Date Range', { bold: true, sz: 11, bgColor: TEAL_LT, border: true }), cell(`${from}  →  ${to}`, { sz: 11, halign: 'center', border: true }), blank(), blank(), blank(), blank()],
+        [cell('Exported On', { bold: true, sz: 11, bgColor: TEAL_LT, border: true }), cell(exportedAt, { sz: 11, halign: 'center', border: true }), blank(), blank(), blank(), blank()],
+        [blank(), blank(), blank(), blank(), blank(), blank()],
+        // Row 7 – summary header
+        [cell('REVENUE SUMMARY', { bold: true, sz: 12, bgColor: TEAL, fgColor: WHITE, halign: 'center' }), null, null, null, null, null],
+        // header columns
+        [
+          cell('Category', { bold: true, sz: 11, bgColor: NAVY, fgColor: WHITE, border: true }),
+          cell('Transactions', { bold: true, sz: 11, bgColor: NAVY, fgColor: WHITE, halign: 'center', border: true }),
+          cell('Total (LKR)', { bold: true, sz: 11, bgColor: NAVY, fgColor: WHITE, halign: 'right', border: true }),
+          cell('% of Total', { bold: true, sz: 11, bgColor: NAVY, fgColor: WHITE, halign: 'right', border: true }),
+          blank(NAVY), blank(NAVY),
+        ],
+        // Room row
+        [
+          cell('Room Revenue', { bold: true, sz: 11, bgColor: TEAL_LT, border: true }),
+          cell(guestsData?.length || 0, { sz: 11, halign: 'center', bgColor: TEAL_LT, border: true }),
+          cell(totalRooms, { bold: true, sz: 11, halign: 'right', bgColor: TEAL_LT, numFmt: fmt, border: true }),
+          cell(grandTotal > 0 ? +((totalRooms / grandTotal) * 100).toFixed(1) : 0, { sz: 11, halign: 'right', bgColor: TEAL_LT, numFmt: '0.0"%"', border: true }),
+          blank(TEAL_LT), blank(TEAL_LT),
+        ],
+        // F&B row
+        [
+          cell('F&B / Restaurant', { bold: true, sz: 11, bgColor: AMB_LT, border: true }),
+          cell((fbData?.length || 0) + (restoData?.length || 0), { sz: 11, halign: 'center', bgColor: AMB_LT, border: true }),
+          cell(totalFB, { bold: true, sz: 11, halign: 'right', bgColor: AMB_LT, numFmt: fmt, border: true }),
+          cell(grandTotal > 0 ? +((totalFB / grandTotal) * 100).toFixed(1) : 0, { sz: 11, halign: 'right', bgColor: AMB_LT, numFmt: '0.0"%"', border: true }),
+          blank(AMB_LT), blank(AMB_LT),
+        ],
+        // Extra row
+        [
+          cell('Extra / Other', { bold: true, sz: 11, bgColor: GRN_LT, border: true }),
+          cell(extraData?.length || 0, { sz: 11, halign: 'center', bgColor: GRN_LT, border: true }),
+          cell(totalExtra, { bold: true, sz: 11, halign: 'right', bgColor: GRN_LT, numFmt: fmt, border: true }),
+          cell(grandTotal > 0 ? +((totalExtra / grandTotal) * 100).toFixed(1) : 0, { sz: 11, halign: 'right', bgColor: GRN_LT, numFmt: '0.0"%"', border: true }),
+          blank(GRN_LT), blank(GRN_LT),
+        ],
+        // Grand total row
+        [
+          cell('GRAND TOTAL', { bold: true, sz: 12, bgColor: TOTAL_BG, fgColor: WHITE, border: true }),
+          cell((guestsData?.length || 0) + (fbData?.length || 0) + (restoData?.length || 0) + (extraData?.length || 0), { bold: true, sz: 11, halign: 'center', bgColor: TOTAL_BG, fgColor: WHITE, border: true }),
+          cell(grandTotal, { bold: true, sz: 12, halign: 'right', bgColor: TOTAL_BG, fgColor: { rgb: '34D399' }, numFmt: fmt, border: true }),
+          cell(100, { bold: true, sz: 11, halign: 'right', bgColor: TOTAL_BG, fgColor: WHITE, numFmt: '0.0"%"', border: true }),
+          blank(TOTAL_BG, true), blank(TOTAL_BG, true),
+        ],
+        [blank(), blank(), blank(), blank(), blank(), blank()],
+        [cell('Crystal Sands Hotel Management System', { italic: true, sz: 9, fgColor: { rgb: '94A3B8' } }), null, null, null, null, null],
+      ]
+
+      const wsCover = buildSheet(coverRows, [
+        { wch: 28 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 10 }, { wch: 10 }
+      ], 8)
+
+      // Merge cells for title rows and summary header
+      wsCover['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+        { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+        { s: { r: 2, c: 0 }, e: { r: 2, c: 5 } },
+        { s: { r: 3, c: 1 }, e: { r: 3, c: 5 } },
+        { s: { r: 4, c: 1 }, e: { r: 4, c: 5 } },
+        { s: { r: 5, c: 1 }, e: { r: 5, c: 5 } },
+        { s: { r: 7, c: 0 }, e: { r: 7, c: 5 } },
+        { s: { r: 14, c: 0 }, e: { r: 14, c: 5 } },
+      ]
+      wsCover['!rows'] = [{ hpt: 36 }, { hpt: 22 }, { hpt: 10 }, { hpt: 22 }, { hpt: 22 }, { hpt: 22 }, { hpt: 10 }, { hpt: 24 }, { hpt: 22 }, { hpt: 22 }, { hpt: 22 }, { hpt: 22 }, { hpt: 26 }]
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // Helper: build data sheet (rooms / F&B / extra)
+      // ═══════════════════════════════════════════════════════════════════════
+      const buildDataSheet = ({ title, sheetColor, lightColor, dataRows, totalAmount, totalLabel }) => {
+        const COLS = ['Room No.', 'Guest / Description', 'Check-in Date & Time', 'Checkout Date & Time', 'Amount (LKR)']
+        const numFmtLKR = '#,##0.00'
+
+        const rows = [
+          // Row 0: big title
+          Array(COLS.length).fill(null).map((_, i) =>
+            i === 0 ? cell('CRYSTAL SANDS', { bold: true, sz: 18, bgColor: NAVY, fgColor: WHITE }) : blank(NAVY)),
+          // Row 1: sub-title
+          Array(COLS.length).fill(null).map((_, i) =>
+            i === 0 ? cell(title, { bold: true, sz: 12, bgColor: sheetColor, fgColor: WHITE }) : blank(sheetColor)),
+          // Row 2: period info
+          Array(COLS.length).fill(null).map((_, i) =>
+            i === 0 ? cell(`Period: ${periodLabel}  |  ${from} to ${to}  |  Exported: ${exportedAt}`, { italic: true, sz: 9, bgColor: lightColor }) : blank(lightColor)),
+          // Row 3: blank separator
+          Array(COLS.length).fill(null).map(() => blank()),
+          // Row 4: column headers
+          COLS.map(h => cell(h, { bold: true, sz: 11, bgColor: sheetColor, fgColor: WHITE, halign: h.includes('Amount') ? 'right' : 'left', border: true })),
+        ]
+
+        // Data rows
+        dataRows.forEach((dr, idx) => {
+          const isAlt = idx % 2 === 1
+          const bg = isAlt ? ROW_ALT : null
+          rows.push([
+            cell(dr.room || '', { sz: 11, bgColor: bg, border: true }),
+            cell(dr.desc || '', { sz: 11, bgColor: bg, border: true, wrap: true }),
+            cell(dr.checkIn || '', { sz: 10, bgColor: bg, border: true }),
+            cell(dr.checkOut || '', { sz: 10, bgColor: bg, border: true }),
+            cell(dr.amount, { sz: 11, halign: 'right', bgColor: bg, numFmt: numFmtLKR, border: true }),
+          ])
+        })
+
+        // Empty row before total
+        rows.push(Array(COLS.length).fill(null).map(() => blank()))
+
+        // Total row
+        rows.push([
+          cell(totalLabel, { bold: true, sz: 12, bgColor: TOTAL_BG, fgColor: WHITE, border: true }),
+          blank(TOTAL_BG, true), blank(TOTAL_BG, true), blank(TOTAL_BG, true),
+          cell(totalAmount, { bold: true, sz: 12, halign: 'right', bgColor: TOTAL_BG, fgColor: { rgb: '34D399' }, numFmt: numFmtLKR, border: true }),
+        ])
+
+        // Footer note
+        rows.push(Array(COLS.length).fill(null).map(() => blank()))
+        rows.push([
+          cell('Crystal Sands Hotel Management System — Confidential', { italic: true, sz: 9, fgColor: { rgb: '94A3B8' } }),
+          null, null, null, null,
+        ])
+
+        const ws = buildSheet(rows,
+          [{ wch: 16 }, { wch: 36 }, { wch: 24 }, { wch: 24 }, { wch: 18 }],
+          4)
+
+        // Row heights
+        ws['!rows'] = [{ hpt: 32 }, { hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }]
+
+        // Merges: title + subtitle + period row span all 5 cols
+        ws['!merges'] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 4 } },
+          { s: { r: rows.length - 2, c: 0 }, e: { r: rows.length - 2, c: 4 } },
+          { s: { r: rows.length - 1, c: 0 }, e: { r: rows.length - 1, c: 4 } },
+          { s: { r: rows.length - 3, c: 0 }, e: { r: rows.length - 3, c: 3 } }, // total label span
+        ]
+
+        return ws
+      }
+
+      // ── Sheet 2: Room Revenue ───────────────────────────────────────────────
+      const roomDataRows = (guestsData || []).map(g => ({
+        room:     (g.room_numbers || []).join(', '),
+        desc:     `${g.name_with_initials || '—'} · Room ×${g.number_of_rooms || 1} (${g.room_type || ''})`,
+        checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+        checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+        amount:   parseFloat(g.total_room_charge || 0),
+      }))
+
+      const wsRooms = buildDataSheet({
+        title:       'Daily Revenue Summary — Rooms',
+        sheetColor:  TEAL,
+        lightColor:  TEAL_LT,
+        dataRows:    roomDataRows,
+        totalAmount: totalRooms,
+        totalLabel:  'TOTAL ROOM REVENUE',
+      })
+
+      // ── Sheet 3: F&B Revenue ───────────────────────────────────────────────
+      const fbDataRows = [
+        ...(fbData || []).map(item => {
+          const g = item.guests || {}
+          return {
+            room:     (g.room_numbers || []).join(', '),
+            desc:     item.item_name || '—',
+            checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+            checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+            amount:   parseFloat(item.total_price || 0),
+          }
+        }),
+        ...(restoData || []).map(item => ({
+          room:     'Restaurant',
+          desc:     item.item_name || '—',
+          checkIn:  '',
+          checkOut: '',
+          amount:   parseFloat(item.total_price || 0),
+        })),
+      ]
+
+      const wsFB = buildDataSheet({
+        title:       'Daily Revenue Summary — F&B / Restaurant',
+        sheetColor:  AMBER,
+        lightColor:  AMB_LT,
+        dataRows:    fbDataRows,
+        totalAmount: totalFB,
+        totalLabel:  'TOTAL F&B REVENUE',
+      })
+
+      // ── Sheet 4: Extra Revenue ─────────────────────────────────────────────
+      const extraDataRows = (extraData || []).map(item => {
+        const g = item.guests || {}
+        return {
+          room:     (g.room_numbers || []).join(', '),
+          desc:     `${item.item_name || '—'} (${item.category || ''})`,
+          checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+          checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+          amount:   parseFloat(item.total_price || 0),
+        }
+      })
+
+      const wsExtra = buildDataSheet({
+        title:       'Daily Revenue Summary — Extra / Other',
+        sheetColor:  GREEN,
+        lightColor:  GRN_LT,
+        dataRows:    extraDataRows,
+        totalAmount: totalExtra,
+        totalLabel:  'TOTAL EXTRA REVENUE',
+      })
+
+      // ── Assemble workbook ─────────────────────────────────────────────────
+      const wb = XLSX.utils.book_new()
+      wb.Props = {
+        Title: 'Crystal Sands Sales Report',
+        Subject: 'Revenue Export',
+        Author: 'Crystal Sands HMS',
+        CreatedDate: new Date(),
+      }
+      XLSX.utils.book_append_sheet(wb, wsCover, '📊 Summary')
+      XLSX.utils.book_append_sheet(wb, wsRooms, '🏨 Room Revenue')
+      XLSX.utils.book_append_sheet(wb, wsFB,    '☕ F&B Revenue')
+      XLSX.utils.book_append_sheet(wb, wsExtra, '🛍️ Extra Revenue')
+
+      XLSX.writeFile(wb, `CrystalSands_Sales_${from}_to_${to}.xlsx`)
+    } catch (error) {
+      console.error('Export error:', error)
+      alert('Failed to export data. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
   const maxBreakdown = Math.max(...revenueByCategory.map(c => c.value), 1)
   const categoryColors = [
     'bg-primary-500', 'bg-cyan-500', 'bg-amber-500', 'bg-green-500',
@@ -263,6 +614,14 @@ export default function Sales() {
             </div>
           )}
         </div>
+        <button
+          onClick={exportSalesData}
+          disabled={loading}
+          className="flex items-center space-x-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors shadow-sm"
+        >
+          <TrendingUp size={16} />
+          <span className="font-medium">Export</span>
+        </button>
       </div>
 
       {/* Custom Range Picker */}

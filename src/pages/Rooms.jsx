@@ -90,9 +90,14 @@ export default function Rooms() {
       const { data } = await supabase
         .from('rooms')
         .select('*')
-        .order('room_number')
 
-      setRooms(data || [])
+      const sortedRooms = (data || []).sort((a, b) => {
+        const numA = parseInt(a.room_number.replace(/\\D/g, '')) || 0;
+        const numB = parseInt(b.room_number.replace(/\\D/g, '')) || 0;
+        return numA - numB;
+      });
+
+      setRooms(sortedRooms)
       setLoading(false)
     } catch (error) {
       console.error('Error loading rooms:', error)
@@ -936,6 +941,9 @@ export default function Rooms() {
                     >
                       Room {room.room_number}
                     </button>
+                    <div className="text-[10px] font-bold text-primary-500 uppercase tracking-wider mt-1">
+                      {roomTypeMap[room.room_type] || room.room_type}
+                    </div>
                     {roomGuest && (
                       <div className="text-xs text-slate-500 dark:text-gray-400 mt-1 truncate">{roomGuest.name_with_initials}</div>
                     )}
