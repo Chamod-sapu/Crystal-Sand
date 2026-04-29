@@ -19,6 +19,36 @@ export function calculateRoomCharges(dateArrival, dateDeparture, numberOfRooms, 
 }
 
 /**
+ * Calculate dynamic room charges based on occupancy and room group
+ */
+export function calculateDynamicRoomCharges(dateArrival, dateDeparture, roomPrices = [], roomGroup = 'A', occupancy = 1, fallbackBasePrice = 0, stayType = null) {
+  const arrival = new Date(dateArrival)
+  const departure = new Date(dateDeparture)
+  let nights = differenceInDays(departure, arrival)
+  
+  // Use explicit stayType if provided, otherwise auto-detect
+  const isDayBooking = stayType ? stayType === 'day' : (nights === 0 && dateArrival === dateDeparture)
+  
+  if (nights === 0 && dateArrival === dateDeparture) {
+    nights = 1 // Logic to treat same day as 1 night for fallback
+  }
+
+  // Find pricing rule
+  const rule = roomPrices.find(r => r.room_group === roomGroup && r.occupancy === occupancy)
+  
+  if (rule) {
+    if (isDayBooking) {
+      return Number(rule.day_price)
+    } else {
+      return Number(rule.night_price) * Math.max(1, nights)
+    }
+  }
+  
+  // Fallback to base price if no rule found
+  return nights * fallbackBasePrice
+}
+
+/**
  * Calculate discount information from guest data
  * Reverse calculates original room charge from discounted price
  */

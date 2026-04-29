@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { logActivity } from '../lib/activityLogger'
 import { useAuth } from '../context/AuthContext'
-import { formatCurrency, calculateBillTotal } from '../utils/calculations'
+import { formatCurrency, calculateBillTotal, calculateDynamicRoomCharges } from '../utils/calculations'
 import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag } from 'lucide-react'
 import { format, addDays, differenceInDays } from 'date-fns'
 import jsPDF from 'jspdf'
@@ -49,12 +49,16 @@ export default function Rooms() {
   const [extendLoading, setExtendLoading] = useState(false)
   const [extendError, setExtendError] = useState('')
   const [checkingIn, setCheckingIn] = useState(false)
+  const [activeTab, setActiveTab] = useState('rooms') // 'rooms' or 'pricing'
+  const [roomPricing, setRoomPricing] = useState([])
+  const [savingPricing, setSavingPricing] = useState(false)
 
   useEffect(() => {
     initializeRoomTypes()
     loadRooms()
     loadRoomTypes()
     loadGuests()
+    loadPricing()
   }, [])
 
   useEffect(() => {
@@ -125,6 +129,41 @@ export default function Rooms() {
       setRoomTypes(data || [])
     } catch (error) {
       console.error('Error loading room types:', error)
+    }
+  }
+
+  async function loadPricing() {
+    try {
+      const { data, error } = await supabase
+        .from('room_pricing')
+        .select('*')
+        .order('room_group')
+        .order('occupancy')
+      
+      if (error) throw error
+      setRoomPricing(data || [])
+    } catch (error) {
+      console.error('Error loading pricing rules:', error)
+    }
+  }
+
+  async function handleUpdatePrice(id, field, value) {
+    if (!canManageRooms()) return
+
+    setSavingPricing(true)
+    try {
+      const { error } = await supabase
+        .from('room_pricing')
+        .update({ [field]: parseFloat(value) || 0, updated_at: new Date().toISOString() })
+        .eq('id', id)
+
+      if (error) throw error
+      await loadPricing()
+    } catch (error) {
+      console.error('Error updating price:', error)
+      alert('Failed to update price')
+    } finally {
+      setSavingPricing(false)
     }
   }
 
@@ -203,18 +242,28 @@ export default function Rooms() {
       newNights = 1
     }
     
-    let additionalNights = differenceInDays(newDepartureDate, currentDeparture)
-    if (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure) {
-      if (newDepartureDate > currentDeparture) {
-        additionalNights = Math.max(0, newNights - 1)
-      }
-    }
-    
-    const numberOfRooms = selectedGuestPopup.room_numbers.length
+    // Calculate new total using dynamic pricing
+    const newTotalRoomCharge = selectedGuestPopup.room_numbers.reduce((total, roomNum) => {
+      const roomObj = rooms.find(r => r.room_number === roomNum)
+      const roomNumInt = parseInt(roomNum)
+      const roomGroup = [1,2,3,5,6,7].includes(roomNumInt) ? 'A' : 'B'
+      const occupancy = selectedGuestPopup.room_occupancies?.[roomNum] || 1
+      
+      const roomCharge = calculateDynamicRoomCharges(
+        selectedGuestPopup.date_of_arrival,
+        extendDate,
+        roomPricing,
+        roomGroup,
+        occupancy,
+        roomObj?.base_price || 0,
+        selectedGuestPopup.stay_type
+      )
+      return total + roomCharge
+    }, 0)
+
+    const additionalCharge = newTotalRoomCharge - parseFloat(selectedGuestPopup.total_room_charge)
     const effectiveNights = selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)
-    const pricePerNight = parseFloat(selectedGuestPopup.total_room_charge) / (effectiveNights * numberOfRooms) || 0
-    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
-    const newTotalRoomCharge = parseFloat(selectedGuestPopup.total_room_charge) + additionalCharge
+    const additionalNights = newNights - effectiveNights
 
     setExtendPreview({
       currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -678,11 +727,31 @@ export default function Rooms() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Rooms Management</h1>
-          <p className="text-slate-500 dark:text-gray-400 mt-1">Manage hotel rooms and availability</p>
+        <div className="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+          <button
+            onClick={() => setActiveTab('rooms')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === 'rooms'
+                ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm'
+                : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+            }`}
+          >
+            Rooms Overview
+          </button>
+          {canManageRooms() && (
+            <button
+              onClick={() => setActiveTab('pricing')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === 'pricing'
+                  ? 'bg-white dark:bg-slate-700 text-primary-600 dark:text-white shadow-sm'
+                  : 'text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-200'
+              }`}
+            >
+              Pricing Rules
+            </button>
+          )}
         </div>
-        {canManageRooms() && (
+        {activeTab === 'rooms' && canManageRooms() && (
           <button
             onClick={() => {
               resetForm()
@@ -691,10 +760,122 @@ export default function Rooms() {
             className="btn-primary flex items-center space-x-2"
           >
             <Plus size={20} />
-            <span>New Room </span>
+            <span>New Room</span>
           </button>
         )}
       </div>
+
+      {activeTab === 'pricing' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="card p-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Room Pricing Management</h2>
+            <p className="text-sm text-slate-500 dark:text-gray-400 mb-6">
+              Configure Day and Night prices based on occupancy levels for each room group.
+            </p>
+
+            <div className="space-y-8">
+              {/* Group A */}
+              <div>
+                <h3 className="text-lg font-bold text-primary-400 mb-4 flex items-center space-x-2">
+                  <Tag size={20} />
+                  <span>Group A (Rooms 1, 2, 3, 5, 6, 7)</span>
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800">
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Occupancy</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Day Price (LKR)</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Night Price (LKR)</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roomPricing.filter(p => p.room_group === 'A').map(p => (
+                        <tr key={p.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-4 px-4 font-medium text-slate-900 dark:text-white">{p.label}</td>
+                          <td className="py-4 px-4">
+                            <input
+                              type="number"
+                              value={p.day_price}
+                              onChange={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
+                              className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
+                              disabled={savingPricing}
+                            />
+                          </td>
+                          <td className="py-4 px-4">
+                            <input
+                              type="number"
+                              value={p.night_price}
+                              onChange={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
+                              className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
+                              disabled={savingPricing}
+                            />
+                          </td>
+                          <td className="py-4 px-4 text-xs text-slate-500">
+                            {format(new Date(p.updated_at), 'MMM dd, HH:mm')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Group B */}
+              <div>
+                <h3 className="text-lg font-bold text-primary-400 mb-4 flex items-center space-x-2">
+                  <Tag size={20} />
+                  <span>Group B (Rooms 4, 8)</span>
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-slate-800">
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Occupancy</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Day Price (LKR)</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Night Price (LKR)</th>
+                        <th className="py-3 px-4 text-slate-500 dark:text-gray-400 font-medium">Last Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {roomPricing.filter(p => p.room_group === 'B').map(p => (
+                        <tr key={p.id} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-4 px-4 font-medium text-slate-900 dark:text-white">{p.label}</td>
+                          <td className="py-4 px-4">
+                            <input
+                              type="number"
+                              value={p.day_price}
+                              onChange={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
+                              className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
+                              disabled={savingPricing}
+                            />
+                          </td>
+                          <td className="py-4 px-4">
+                            <input
+                              type="number"
+                              value={p.night_price}
+                              onChange={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
+                              className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
+                              disabled={savingPricing}
+                            />
+                          </td>
+                          <td className="py-4 px-4 text-xs text-slate-500">
+                            {format(new Date(p.updated_at), 'MMM dd, HH:mm')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'rooms' && (
+        <div className="animate-in fade-in duration-500">
 
       {/* Modal Popup for Add/Edit Room */}
       {showForm && (
@@ -866,7 +1047,7 @@ export default function Rooms() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 my-5">
         {roomTypes.map(type => {
           const stats = statsByType[type.code] || { count: 0, occupied: 0, reserved: 0, available: 0 }
           return (
@@ -945,7 +1126,23 @@ export default function Rooms() {
                       {roomTypeMap[room.room_type] || room.room_type}
                     </div>
                     {roomGuest && (
-                      <div className="text-xs text-slate-500 dark:text-gray-400 mt-1 truncate">{roomGuest.name_with_initials}</div>
+                      <div className="space-y-1 mt-1">
+                        <div className="text-xs text-slate-500 dark:text-gray-400 truncate">{roomGuest.name_with_initials}</div>
+                        <div className="flex items-center justify-center space-x-2">
+                          {roomGuest.room_occupancies?.[room.room_number] && (
+                            <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600">
+                              {roomGuest.room_occupancies[room.room_number]} Pax
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                            roomGuest.stay_type === 'day' 
+                              ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' 
+                              : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                          }`}>
+                            {roomGuest.stay_type === 'day' ? 'DAY' : 'NIGHT'}
+                          </span>
+                        </div>
+                      </div>
                     )}
                   </div>
 
@@ -1207,26 +1404,47 @@ export default function Rooms() {
                   </div>
 
                   <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4">
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                       <div>
-                        <p className="text-xs text-gray-500">Room(s)</p>
-                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.room_numbers?.join(', ')}</p>
+                        <p className="text-xs text-gray-500">Room(s) & Occupancy</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {selectedGuestPopup.room_numbers?.map(rn => (
+                            <div key={rn} className="flex flex-col">
+                              <span className="bg-primary-600 text-white px-2 py-0.5 rounded text-xs font-bold text-center">
+                                {rn}
+                              </span>
+                              {selectedGuestPopup.room_occupancies?.[rn] && (
+                                <span className="text-[10px] text-center text-slate-500">
+                                  {selectedGuestPopup.room_occupancies[rn]} Pax
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Room Type</p>
-                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.room_type}</p>
+                        <p className="text-xs text-gray-500">Stay Type</p>
+                        <p className="mt-1">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            selectedGuestPopup.stay_type === 'day' 
+                              ? 'bg-yellow-500/20 text-yellow-500' 
+                              : 'bg-indigo-500/20 text-indigo-400'
+                          }`}>
+                            {selectedGuestPopup.stay_type === 'day' ? 'Day Use' : 'Night Stay'}
+                          </span>
+                        </p>
                       </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-center border-t border-slate-200 dark:border-slate-700 pt-4">
                       <div>
                         <p className="text-xs text-gray-500">Meal Plan</p>
                         <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.meal_plan || 'N/A'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Adults</p>
-                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.number_of_adults}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Children</p>
-                        <p className="text-slate-900 dark:text-white font-bold">{selectedGuestPopup.number_of_children}</p>
+                        <p className="text-xs text-gray-500">Guests</p>
+                        <p className="text-slate-900 dark:text-white font-bold">
+                          {selectedGuestPopup.number_of_adults}A, {selectedGuestPopup.number_of_children}C
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Nights</p>
@@ -1306,6 +1524,8 @@ export default function Rooms() {
             </div>
 
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { formatCurrency, calculateBillTotal, calculateDiscountInfo } from '../utils/calculations'
+import { formatCurrency, calculateBillTotal, calculateDiscountInfo, calculateDynamicRoomCharges } from '../utils/calculations'
 import { format, differenceInDays, addDays, parseISO } from 'date-fns'
 import {
   ArrowLeft,
@@ -45,6 +45,9 @@ export default function GuestDetails() {
     unit_price: 0
   })
 
+  const [roomPricing, setRoomPricing] = useState([])
+  const [allRooms, setAllRooms] = useState([])
+
   const [showExtendStay, setShowExtendStay] = useState(false)
   const [extendDate, setExtendDate] = useState('')
   const [extendLoading, setExtendLoading] = useState(false)
@@ -58,7 +61,15 @@ export default function GuestDetails() {
   useEffect(() => {
     loadGuestData()
     loadSettings()
+    loadPricingData()
   }, [id])
+
+  async function loadPricingData() {
+    const { data: pricing } = await supabase.from('room_pricing').select('*')
+    const { data: rooms } = await supabase.from('rooms').select('*')
+    setRoomPricing(pricing || [])
+    setAllRooms(rooms || [])
+  }
 
   useEffect(() => {
     if (extendDate && guest) {
@@ -189,27 +200,33 @@ export default function GuestDetails() {
     const arrival = new Date(guest.date_of_arrival)
     let newNights = differenceInDays(newDepartureDate, arrival)
     
-    // For same-day bookings, newNights should be at least 1
     if (newNights === 0 && guest.date_of_arrival === extendDate) {
       newNights = 1
     }
     
-    // If extending from same-day (which was 1 night) to 1-night stay (which is also 1 night), additionalNights is 0
-    let additionalNights = differenceInDays(newDepartureDate, currentDeparture)
-    if (guest.date_of_arrival === guest.date_of_departure) {
-      // It was a same-day room booking
-      if (newDepartureDate > currentDeparture) {
-        // If extending to next day, additional nights should be (total new nights - 1)
-        additionalNights = Math.max(0, newNights - 1)
-      }
-    }
-    
-    const numberOfRooms = guest.room_numbers.length
-    // Fallback for number_of_nights if it's 0 (legacy same-day bookings)
+    // Calculate new total using dynamic pricing
+    const newTotalRoomCharge = guest.room_numbers.reduce((total, roomNum) => {
+      const roomObj = allRooms.find(r => r.room_number === roomNum)
+      const roomNumInt = parseInt(roomNum)
+      const roomGroup = [1,2,3,5,6,7].includes(roomNumInt) ? 'A' : 'B'
+      const occupancy = guest.room_occupancies?.[roomNum] || 1
+      
+      const roomCharge = calculateDynamicRoomCharges(
+        guest.date_of_arrival,
+        extendDate,
+        roomPricing,
+        roomGroup,
+        occupancy,
+        roomObj?.base_price || 0,
+        guest.stay_type
+      )
+      return total + roomCharge
+    }, 0)
+
+    const additionalCharge = newTotalRoomCharge - parseFloat(guest.total_room_charge)
     const effectiveNights = guest.number_of_nights || (guest.date_of_arrival === guest.date_of_departure ? 1 : 0)
-    const pricePerNight = parseFloat(guest.total_room_charge) / (effectiveNights * numberOfRooms) || 0
-    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
-    const newTotalRoomCharge = parseFloat(guest.total_room_charge) + additionalCharge
+    const additionalNights = newNights - effectiveNights
+    const pricePerNight = additionalNights > 0 ? additionalCharge / (additionalNights * guest.room_numbers.length) : 0
 
     setExtendPreview({
       currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -820,18 +837,34 @@ export default function GuestDetails() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Numbers</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room(s) & Occupancy</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {guest.room_numbers.map(room => (
-                      <span key={room} className="px-3 py-1 bg-primary-600 rounded-lg text-white font-medium">
-                        {room}
-                      </span>
+                      <div key={room} className="flex flex-col">
+                        <span className="px-3 py-1 bg-primary-600 rounded-lg text-white font-medium text-center">
+                          {room}
+                        </span>
+                        {guest.room_occupancies?.[room] && (
+                          <span className="text-[10px] text-center text-slate-500 mt-0.5">
+                            {guest.room_occupancies[room]} {guest.room_occupancies[room] === 1 ? 'Guest' : 'Guests'}
+                          </span>
+                        )}
+                      </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Type</p>
-                  <p className="text-slate-900 dark:text-white font-medium">{guest.room_type}</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Type & Stay</p>
+                  <p className="text-slate-900 dark:text-white font-medium">
+                    {guest.room_type} 
+                    <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                      guest.stay_type === 'day' 
+                        ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' 
+                        : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                    }`}>
+                      {guest.stay_type === 'day' ? 'Day Use' : 'Night Stay'}
+                    </span>
+                  </p>
                 </div>
                 <div>
                   <p className="text-slate-500 dark:text-gray-400 text-sm">Guests</p>

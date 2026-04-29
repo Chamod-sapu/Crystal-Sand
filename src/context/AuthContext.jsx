@@ -11,12 +11,36 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const isLoginInProgress = useRef(false)
 
+  const SESSION_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
+
   useEffect(() => {
     let isMounted = true
+
+    const checkSessionExpiration = async () => {
+      const loginTimestamp = localStorage.getItem('login_timestamp')
+      if (loginTimestamp) {
+        const now = new Date().getTime()
+        const elapsed = now - parseInt(loginTimestamp)
+        
+        if (elapsed > SESSION_DURATION) {
+          console.warn('Auth: Session expired (24h limit reached)')
+          await logout()
+          return true
+        }
+      }
+      return false
+    }
 
     // Step 1: Initialize auth from existing session (runs OUTSIDE onAuthStateChange to avoid deadlock)
     async function initializeAuth() {
       try {
+        // First check if the custom 24h session has expired
+        const isExpired = await checkSessionExpiration()
+        if (isExpired) {
+          setLoading(false)
+          return
+        }
+
         const { data: { session } } = await supabase.auth.getSession()
 
         if (session?.user && isMounted) {
@@ -52,9 +76,12 @@ export function AuthProvider({ children }) {
 
     initializeAuth()
 
+    const interval = setInterval(checkSessionExpiration, 60000) // Check every minute
+
     return () => {
       isMounted = false
       subscription.unsubscribe()
+      clearInterval(interval)
     }
   }, [])
 
@@ -151,6 +178,9 @@ export function AuthProvider({ children }) {
 
       // Log successful login
       await logActivity(profile, 'login', 'user', `User ${profile.full_name} logged in successfully`)
+      
+      // Store login timestamp for 24h expiration check
+      localStorage.setItem('login_timestamp', new Date().getTime().toString())
 
       return { user: data.user, profile }
     } catch (err) {
@@ -167,6 +197,7 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
     setUser(null)
     setUserProfile(null)
+    localStorage.removeItem('login_timestamp')
   }
 
   async function refreshSystemSettings() {

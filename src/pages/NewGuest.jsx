@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { logActivity } from '../lib/activityLogger'
 import { generateGRCNumber } from '../utils/grcGenerator'
-import { calculateRoomCharges, formatCurrency } from '../utils/calculations'
+import { calculateRoomCharges, calculateDynamicRoomCharges, formatCurrency } from '../utils/calculations'
 import { format, differenceInDays } from 'date-fns'
 import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 'lucide-react'
 
@@ -17,6 +17,7 @@ export default function NewGuest() {
   const [allRoomsWithStatus, setAllRoomsWithStatus] = useState([])
   const [guests, setGuests] = useState([])
   const [roomTypes, setRoomTypes] = useState([])
+  const [roomPricing, setRoomPricing] = useState([])
   const [error, setError] = useState('')
   const [validationErrors, setValidationErrors] = useState({})
   const [uploadedFile, setUploadedFile] = useState(null)
@@ -89,7 +90,9 @@ export default function NewGuest() {
     remarks: '',
     passport_nic_document_url: '',
     discount_type: '',
-    discount_amount: 0
+    discount_amount: 0,
+    room_occupancies: {},
+    stay_type: 'night'
   })
 
   useEffect(() => {
@@ -131,9 +134,18 @@ export default function NewGuest() {
         .from('room_types')
         .select('*')
 
+      let pricingData = []
+      try {
+        const { data } = await supabase.from('room_pricing').select('*')
+        if (data) pricingData = data
+      } catch (err) {
+        console.warn('room_pricing table not available yet, using fallback')
+      }
+
       setAllRooms(roomsData || [])
       setGuests(guestsData || [])
       setRoomTypes(typesData || [])
+      setRoomPricing(pricingData)
     } catch (error) {
       console.error('Error loading data:', error)
       setError('Failed to load data. Please refresh the page.')
@@ -400,19 +412,35 @@ export default function NewGuest() {
     setFormData(prev => {
       const isSelected = prev.room_numbers.includes(roomNumber)
       let newRooms
+      let newOccupancies = { ...prev.room_occupancies }
       
       if (isSelected) {
         newRooms = prev.room_numbers.filter(r => r !== roomNumber)
+        delete newOccupancies[roomNumber]
       } else {
         newRooms = [...prev.room_numbers, roomNumber]
+        newOccupancies[roomNumber] = 1 // Default to 1 guest
       }
       
       return {
         ...prev,
         room_numbers: newRooms,
-        number_of_rooms: newRooms.length
+        number_of_rooms: newRooms.length,
+        room_occupancies: newOccupancies
       }
     })
+  }
+
+  const handleOccupancyChange = (roomNumber, e) => {
+    e.stopPropagation()
+    const value = parseInt(e.target.value) || 1
+    setFormData(prev => ({
+      ...prev,
+      room_occupancies: {
+        ...prev.room_occupancies,
+        [roomNumber]: value
+      }
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -495,11 +523,18 @@ export default function NewGuest() {
         : uniqueTypes[0] || 'Unknown'
 
       const totalRoomCharge = selectedRooms.reduce((total, room) => {
-        const roomCharge = calculateRoomCharges(
+        const roomNum = parseInt(room.room_number)
+        const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
+        const occupancy = formData.room_occupancies[room.room_number] || 1
+        
+        const roomCharge = calculateDynamicRoomCharges(
           formData.date_of_arrival,
           formData.date_of_departure,
-          1,
-          room.base_price || 0
+          roomPricing,
+          roomGroup,
+          occupancy,
+          room.base_price || 0,
+          formData.stay_type
         )
         return total + roomCharge
       }, 0)
@@ -524,6 +559,7 @@ export default function NewGuest() {
           voucher_number: formData.voucher_number || null,
           passport_nic_document_url: documentUrl || null,
           total_room_charge: totalRoomCharge,
+          room_occupancies: formData.room_occupancies, // Store the occupancy breakdown
           number_of_nights: numberOfNights,
           status: guestStatus,
           created_at: new Date().toISOString(),
@@ -615,11 +651,18 @@ export default function NewGuest() {
 
     const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
     const originalRate = selectedRooms.reduce((total, room) => {
-      const roomCharge = calculateRoomCharges(
+      const roomNum = parseInt(room.room_number)
+      const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
+      const occupancy = formData.room_occupancies[room.room_number] || 1
+      
+      const roomCharge = calculateDynamicRoomCharges(
         formData.date_of_arrival,
         formData.date_of_departure,
-        1,
-        room.base_price || 0
+        roomPricing,
+        roomGroup,
+        occupancy,
+        room.base_price || 0,
+        formData.stay_type
       )
       return total + roomCharge
     }, 0)
@@ -995,7 +1038,7 @@ export default function NewGuest() {
 
         <div className="card p-6">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
-            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">3</span>
+            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm text-white">3</span>
             <span>Room Selection</span>
           </h2>
           
@@ -1014,7 +1057,7 @@ export default function NewGuest() {
                       {formData.room_numbers.map(rn => {
                         const rInfo = allRooms.find(r => r.room_number === rn)
                         return (
-                          <span key={rn} className="bg-slate-700 px-2 py-1 rounded text-xs border border-slate-600">
+                          <span key={rn} className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-xs border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200">
                             {rn} ({rInfo?.room_type})
                           </span>
                         )
@@ -1031,9 +1074,35 @@ export default function NewGuest() {
               </div>
             ) : availableRooms.length > 0 ? (
               <>
-                <p className="text-sm text-gray-500 mb-3">
-                  Showing all {availableRooms.length} room(s). Available rooms can be selected.
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500">
+                    Showing all {availableRooms.length} room(s). Available rooms can be selected.
+                  </p>
+                  <div className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, stay_type: 'day' }))}
+                      className={`px-3 py-1 rounded text-xs font-bold transition-all ${
+                        formData.stay_type === 'day'
+                          ? 'bg-primary-600 text-white shadow-lg'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      DAY USE
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, stay_type: 'night' }))}
+                      className={`px-3 py-1 rounded text-xs font-bold transition-all ${
+                        formData.stay_type === 'night'
+                          ? 'bg-primary-600 text-white shadow-lg'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      NIGHT STAY
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {availableRooms.map(room => (
                     <button
@@ -1053,7 +1122,21 @@ export default function NewGuest() {
                       <div className="text-[10px] font-bold text-primary-500 uppercase tracking-wider mb-1">{roomTypeMap[room.room_type] || room.room_type}</div>
                       <div className="text-xs">Floor {room.floor || 1}</div>
                       <div className="text-xs opacity-75 mt-1">
-                        LKR {room.base_price?.toLocaleString() || '0'}
+                        {formData.room_numbers.includes(room.room_number) ? (
+                          <span className="font-bold text-primary-500">
+                            LKR {calculateDynamicRoomCharges(
+                              formData.date_of_arrival,
+                              formData.date_of_departure,
+                              roomPricing,
+                              [1,2,3,5,6,7].includes(parseInt(room.room_number)) ? 'A' : 'B',
+                              formData.room_occupancies[room.room_number] || 1,
+                              room.base_price || 0,
+                              formData.stay_type
+                            ).toLocaleString()}
+                          </span>
+                        ) : (
+                          <>LKR {room.base_price?.toLocaleString() || '0'}</>
+                        )}
                       </div>
                       {room.isOccupied && (
                         <div className="text-[10px] uppercase font-bold text-red-500 mt-1">
@@ -1061,7 +1144,34 @@ export default function NewGuest() {
                         </div>
                       )}
                       {formData.room_numbers.includes(room.room_number) && (
-                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center animate-pulse">
+                        <div className="mt-3 pt-3 border-t border-primary-600/30">
+                          <label className="text-[10px] font-bold uppercase tracking-wider block mb-1">Occupancy</label>
+                          <select
+                            value={formData.room_occupancies[room.room_number] || 1}
+                            onChange={(e) => handleOccupancyChange(room.room_number, e)}
+                            className="w-full bg-primary-600 text-white text-xs font-bold py-1 px-2 rounded focus:outline-none focus:ring-1 focus:ring-white/50 cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {[1, 2, 3, 5, 6, 7].includes(parseInt(room.room_number)) ? (
+                              <>
+                                <option value="1">1 Guest (Single)</option>
+                                <option value="2">2 Guests (Double)</option>
+                                <option value="3">3 Guests (Triple)</option>
+                                <option value="4">4 Guests (Quad)</option>
+                                <option value="5">5 Guests (5 Pax)</option>
+                                <option value="6">6 Guests (6 Pax)</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="1">1 Guest (Single)</option>
+                                <option value="2">2 Guests (Double)</option>
+                              </>
+                            )}
+                          </select>
+                        </div>
+                      )}
+                      {formData.room_numbers.includes(room.room_number) && (
+                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center shadow-lg">
                           <div className="w-3 h-3 bg-white rounded-full" />
                         </div>
                       )}

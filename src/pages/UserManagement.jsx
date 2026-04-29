@@ -80,8 +80,8 @@ export default function UserManagement() {
 
   async function countCreatedUsers() {
     if (!userProfile) return
-    const count = users.filter(u => u.created_by === userProfile.id).length
-    setCreatedCount(count)
+    // Count all users currently in the managed list (which excludes super_admins for admin users)
+    setCreatedCount(users.length)
   }
 
   async function handleAddUser(e) {

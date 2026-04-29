@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 import {
   Activity,
   Search,
@@ -48,6 +49,7 @@ const ENTITY_LABELS = {
 }
 
 export default function UserActivity() {
+  const { userProfile, isAdmin, isSuperAdmin } = useAuth()
   const [logs, setLogs] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -76,6 +78,10 @@ export default function UserActivity() {
         .lte('created_at', dateTo + 'T23:59:59')
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+      if (isAdmin()) {
+        query = query.neq('user_role', 'super_admin')
+      }
 
       if (filterRole !== 'all') query = query.eq('user_role', filterRole)
       if (filterAction !== 'all') query = query.eq('action', filterAction)
@@ -230,7 +236,7 @@ export default function UserActivity() {
               <label className="label">Role</label>
               <select value={filterRole} onChange={e => { setFilterRole(e.target.value); setPage(0) }} className="input-field w-auto">
                 <option value="all">All Roles</option>
-                <option value="super_admin">Super Admin</option>
+                {isSuperAdmin() && <option value="super_admin">Super Admin</option>}
                 <option value="admin">Admin</option>
                 <option value="user">User</option>
               </select>
