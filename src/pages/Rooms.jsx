@@ -147,10 +147,15 @@ export default function Rooms() {
     }
   }
 
+  const handlePriceInputChange = (id, field, value) => {
+    setRoomPricing(prev => prev.map(p => 
+      p.id === id ? { ...p, [field]: value } : p
+    ))
+  }
+
   async function handleUpdatePrice(id, field, value) {
     if (!canManageRooms()) return
 
-    setSavingPricing(true)
     try {
       const { error } = await supabase
         .from('room_pricing')
@@ -158,12 +163,11 @@ export default function Rooms() {
         .eq('id', id)
 
       if (error) throw error
-      await loadPricing()
+      // Refresh to get server timestamp
+      loadPricing()
     } catch (error) {
       console.error('Error updating price:', error)
-      alert('Failed to update price')
-    } finally {
-      setSavingPricing(false)
+      // Revert on error could be added here if needed
     }
   }
 
@@ -798,18 +802,18 @@ export default function Rooms() {
                             <input
                               type="number"
                               value={p.day_price}
-                              onChange={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
+                              onChange={(e) => handlePriceInputChange(p.id, 'day_price', e.target.value)}
+                              onBlur={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
                               className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
-                              disabled={savingPricing}
                             />
                           </td>
                           <td className="py-4 px-4">
                             <input
                               type="number"
                               value={p.night_price}
-                              onChange={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
+                              onChange={(e) => handlePriceInputChange(p.id, 'night_price', e.target.value)}
+                              onBlur={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
                               className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
-                              disabled={savingPricing}
                             />
                           </td>
                           <td className="py-4 px-4 text-xs text-slate-500">
@@ -846,18 +850,18 @@ export default function Rooms() {
                             <input
                               type="number"
                               value={p.day_price}
-                              onChange={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
+                              onChange={(e) => handlePriceInputChange(p.id, 'day_price', e.target.value)}
+                              onBlur={(e) => handleUpdatePrice(p.id, 'day_price', e.target.value)}
                               className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
-                              disabled={savingPricing}
                             />
                           </td>
                           <td className="py-4 px-4">
                             <input
                               type="number"
                               value={p.night_price}
-                              onChange={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
+                              onChange={(e) => handlePriceInputChange(p.id, 'night_price', e.target.value)}
+                              onBlur={(e) => handleUpdatePrice(p.id, 'night_price', e.target.value)}
                               className="w-32 bg-slate-100 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-sm font-bold text-primary-500 focus:ring-2 focus:ring-primary-500"
-                              disabled={savingPricing}
                             />
                           </td>
                           <td className="py-4 px-4 text-xs text-slate-500">
