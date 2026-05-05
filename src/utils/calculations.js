@@ -97,7 +97,8 @@ export function calculateBillTotal(
   purchases, 
   taxPercentage, 
   advancePayment = 0,
-  discountInfo = null
+  discountInfo = null,
+  poolVisits = []
 ) {
   const roomChargesAmount = parseFloat(roomCharges || 0)
   
@@ -107,7 +108,8 @@ export function calculateBillTotal(
   
   const restaurantTotal = restaurantPurchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
   const otherPurchasesTotal = otherPurchases.reduce((sum, p) => sum + parseFloat(p.total_price || 0), 0)
-  const purchasesTotal = restaurantTotal + otherPurchasesTotal
+  const poolTotal = (poolVisits || []).reduce((sum, p) => sum + parseFloat(p.total_charge || 0), 0)
+  const purchasesTotal = restaurantTotal + otherPurchasesTotal + poolTotal
   
   // No tax applied to purchases
   const tax = 0
@@ -123,6 +125,7 @@ export function calculateBillTotal(
     purchasesTotal,
     restaurantPurchasesTotal: restaurantTotal,
     otherPurchasesTotal,
+    poolTotal,
     subtotal,
     tax,
     taxableAmount: restaurantTotal, // Only restaurant purchases are taxed
@@ -155,7 +158,8 @@ export function calculateBillTotalWithDiscount(
   purchases,
   taxPercentage,
   advancePayment = 0,
-  guest = null
+  guest = null,
+  poolVisits = []
 ) {
   let discountInfo = null
 
@@ -173,7 +177,8 @@ export function calculateBillTotalWithDiscount(
     purchases,
     taxPercentage,
     advancePayment,
-    discountInfo
+    discountInfo,
+    poolVisits
   )
 }
 

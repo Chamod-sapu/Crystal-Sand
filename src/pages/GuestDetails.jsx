@@ -34,6 +34,7 @@ export default function GuestDetails() {
   const navigate = useNavigate()
   const [guest, setGuest] = useState(null)
   const [purchases, setPurchases] = useState([])
+  const [poolVisits, setPoolVisits] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddPurchase, setShowAddPurchase] = useState(false)
@@ -93,8 +94,15 @@ export default function GuestDetails() {
         .eq('guest_id', id)
         .order('purchase_date', { ascending: false })
 
+      const { data: poolData } = await supabase
+        .from('pool_visits')
+        .select('*')
+        .eq('guest_id', id)
+        .order('created_at', { ascending: false })
+
       setGuest(guestData)
       setPurchases(purchasesData || [])
+      setPoolVisits(poolData || [])
 
       if (guestData.passport_nic_document_url) {
         const { data, error } = await supabase.storage
@@ -397,8 +405,21 @@ export default function GuestDetails() {
     )
   }
 
-  function generateInvoicePDF() {
+  async function generateInvoicePDF() {
     if (!guest || !settings) return
+
+    // Record first invoice download timestamp (marks the sale moment)
+    if (!guest.first_invoice_downloaded_at) {
+      const now = new Date().toISOString()
+      const { error } = await supabase
+        .from('guests')
+        .update({ first_invoice_downloaded_at: now })
+        .eq('id', id)
+
+      if (!error) {
+        setGuest(prev => ({ ...prev, first_invoice_downloaded_at: now }))
+      }
+    }
 
     const discountInfo = getDiscountInfo(guest)
 
@@ -407,7 +428,8 @@ export default function GuestDetails() {
       purchases,
       settings.tax_percentage,
       guest.advance_payment_amount,
-      discountInfo
+      discountInfo,
+      poolVisits
     )
 
     const doc = new jsPDF()
@@ -472,6 +494,15 @@ export default function GuestDetails() {
         purchase.quantity.toString(),
         formatCurrency(purchase.unit_price),
         formatCurrency(purchase.total_price)
+      ])
+    })
+
+    poolVisits.forEach(visit => {
+      tableData.push([
+        `Pool Access (${visit.number_of_hours || 4} hours)`,
+        visit.number_of_persons.toString(),
+        formatCurrency(visit.charge_per_person),
+        formatCurrency(visit.total_charge)
       ])
     })
 
@@ -549,7 +580,8 @@ export default function GuestDetails() {
     purchases,
     settings.tax_percentage,
     guest.advance_payment_amount,
-    discountInfo
+    discountInfo,
+    poolVisits
   ) : null
 
   return (
@@ -1159,6 +1191,12 @@ export default function GuestDetails() {
                   <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
                     <span className="text-slate-500 dark:text-gray-400">Other Purchases</span>
                     <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.otherPurchasesTotal)}</span>
+                  </div>
+                )}
+                {bill.poolTotal > 0 && (
+                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
+                    <span className="text-slate-500 dark:text-gray-400">Pool Access</span>
+                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.poolTotal)}</span>
                   </div>
                 )}
                 {bill.purchasesTotal === 0 && (

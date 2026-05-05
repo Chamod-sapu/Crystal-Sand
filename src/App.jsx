@@ -12,6 +12,7 @@ import UserManagement from './pages/UserManagement'
 import SystemSettings from './pages/SystemSettings'
 import Sales from './pages/Sales'
 import UserActivity from './pages/UserActivity'
+import Pool from './pages/Pool'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PowerOff } from 'lucide-react'
@@ -157,6 +158,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requireRole="manage_users">
             <Layout><UserManagement /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pool"
+        element={
+          <ProtectedRoute>
+            <Layout><Pool /></Layout>
           </ProtectedRoute>
         }
       />
