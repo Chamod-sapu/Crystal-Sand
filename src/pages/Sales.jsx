@@ -15,7 +15,7 @@ import {
   Loader2,
   Filter
 } from 'lucide-react'
-import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns'
+import { format, subDays, startOfDay, endOfDay, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO } from 'date-fns'
 import XLSX from 'xlsx-js-style'
 
 const PERIOD_OPTIONS = [
@@ -29,28 +29,61 @@ const PERIOD_OPTIONS = [
   { label: 'Custom Range', value: 'custom' },
 ]
 
+// Returns midnight-to-midnight ISO timestamps for the selected period
+// e.g. "today" = 2026-05-05T00:00:00 to 2026-05-06T00:00:00
 function getPeriodDates(period, customFrom, customTo) {
   const now = new Date()
+  let fromDate, toDate
+
   switch (period) {
     case 'today':
-      return { from: format(now, 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
-    case 'yesterday':
+      fromDate = startOfDay(now)
+      toDate = startOfDay(now)
+      break
+    case 'yesterday': {
       const yesterday = subDays(now, 1)
-      return { from: format(yesterday, 'yyyy-MM-dd'), to: format(yesterday, 'yyyy-MM-dd') }
+      fromDate = startOfDay(yesterday)
+      toDate = startOfDay(yesterday)
+      break
+    }
     case '3days':
-      return { from: format(subDays(now, 2), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+      fromDate = startOfDay(subDays(now, 2))
+      toDate = startOfDay(now)
+      break
     case '7days':
-      return { from: format(subDays(now, 6), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+      fromDate = startOfDay(subDays(now, 6))
+      toDate = startOfDay(now)
+      break
     case '30days':
-      return { from: format(subDays(now, 29), 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+      fromDate = startOfDay(subDays(now, 29))
+      toDate = startOfDay(now)
+      break
     case 'month':
-      return { from: format(startOfMonth(now), 'yyyy-MM-dd'), to: format(endOfMonth(now), 'yyyy-MM-dd') }
+      fromDate = startOfMonth(now)
+      toDate = endOfMonth(now)
+      break
     case 'year':
-      return { from: format(startOfYear(now), 'yyyy-MM-dd'), to: format(endOfYear(now), 'yyyy-MM-dd') }
+      fromDate = startOfYear(now)
+      toDate = endOfYear(now)
+      break
     case 'custom':
-      return { from: customFrom, to: customTo }
+      fromDate = startOfDay(new Date(customFrom))
+      toDate = startOfDay(new Date(customTo))
+      break
     default:
-      return { from: format(now, 'yyyy-MM-dd'), to: format(now, 'yyyy-MM-dd') }
+      fromDate = startOfDay(now)
+      toDate = startOfDay(now)
+  }
+
+  // from = start of first day (00:00:00), toEnd = start of day AFTER last day (00:00:00)
+  const fromISO = fromDate.toISOString()
+  const toEndISO = startOfDay(new Date(toDate.getTime() + 86400000)).toISOString()
+
+  return {
+    from: format(fromDate, 'yyyy-MM-dd'),
+    to: format(toDate, 'yyyy-MM-dd'),
+    fromISO,
+    toEndISO
   }
 }
 
@@ -104,18 +137,42 @@ export default function Sales() {
 
   async function loadSalesData() {
     setLoading(true)
-    const { from, to } = getPeriodDates(period, customFrom, customTo)
-    const toInclusive = to + 'T23:59:59'
+    const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo)
 
     try {
-      // 1. Room Revenue — from checked-out guests in period
-      const { data: guestsData } = await supabase
-        .from('guests')
-        .select('id, name_with_initials, total_room_charge, date_of_departure, number_of_rooms, room_type, created_at')
-        .gte('date_of_departure', from)
-        .lte('date_of_departure', to)
-        .eq('status', 'checked_out')
-        .order('date_of_departure', { ascending: false })
+      // 1. Room Revenue — two-query approach for backwards compatibility:
+      //    a) New records: filter by first_invoice_downloaded_at (midnight-to-midnight)
+      //    b) Legacy records (NULL first_invoice_downloaded_at): filter by date_of_departure
+      const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at'
+
+      const [{ data: newGuests }, { data: legacyGuests }] = await Promise.all([
+        supabase
+          .from('guests')
+          .select(GUEST_FIELDS)
+          .not('first_invoice_downloaded_at', 'is', null)
+          .gte('first_invoice_downloaded_at', fromISO)
+          .lt('first_invoice_downloaded_at', toEndISO)
+          .eq('status', 'checked_out'),
+        supabase
+          .from('guests')
+          .select(GUEST_FIELDS)
+          .is('first_invoice_downloaded_at', null)
+          .gte('date_of_departure', from)
+          .lte('date_of_departure', to)
+          .eq('status', 'checked_out'),
+      ])
+
+      // Merge & deduplicate by id
+      const seenIds = new Set()
+      const guestsData = [...(newGuests || []), ...(legacyGuests || [])].filter(g => {
+        if (seenIds.has(g.id)) return false
+        seenIds.add(g.id)
+        return true
+      }).sort((a, b) => {
+        const aDate = a.first_invoice_downloaded_at || a.date_of_departure
+        const bDate = b.first_invoice_downloaded_at || b.date_of_departure
+        return new Date(bDate) - new Date(aDate)
+      })
 
       // Also get checked-in guests for count
       const { data: checkedInGuests } = await supabase
@@ -124,33 +181,50 @@ export default function Sales() {
         .gte('date_of_arrival', from)
         .lte('date_of_arrival', to)
 
-      // 2. F&B Revenue (room consumption)
+      // 2. F&B Revenue (room consumption) — midnight-to-midnight
       const { data: fbConsumption } = await supabase
         .from('fb_consumption')
         .select('total_price, category, item_name, consumed_at, quantity')
-        .gte('consumed_at', from)
-        .lte('consumed_at', toInclusive)
+        .gte('consumed_at', fromISO)
+        .lt('consumed_at', toEndISO)
 
-      // 3. Restaurant orders
+      // 3. Restaurant orders — midnight-to-midnight
       const { data: restaurantOrders } = await supabase
         .from('restaurant_orders')
         .select('total_price, item_name, created_at, quantity')
-        .gte('created_at', from)
-        .lte('created_at', toInclusive)
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
 
-      // 4. Other purchases
+      // 4. Other purchases — midnight-to-midnight
       const { data: purchases } = await supabase
         .from('purchases')
         .select('total_price, category, item_name, purchase_date')
-        .gte('purchase_date', from)
-        .lte('purchase_date', toInclusive)
+        .gte('purchase_date', fromISO)
+        .lt('purchase_date', toEndISO)
+
+      // 5. Pool visits (in-house) — midnight-to-midnight
+      const { data: poolVisits } = await supabase
+        .from('pool_visits')
+        .select('total_charge, visit_date, created_at')
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
+
+      // 6. Pool outside visitors — based on first_bill_downloaded_at
+      const { data: poolOutside } = await supabase
+        .from('pool_outside_visitors')
+        .select('total_charge, first_bill_downloaded_at')
+        .not('first_bill_downloaded_at', 'is', null)
+        .gte('first_bill_downloaded_at', fromISO)
+        .lt('first_bill_downloaded_at', toEndISO)
 
       // Calculate totals
       const roomRevenue = (guestsData || []).reduce((s, g) => s + (parseFloat(g.total_room_charge) || 0), 0)
       const fbRoomRevenue = (fbConsumption || []).reduce((s, c) => s + (parseFloat(c.total_price) || 0), 0)
       const fbRestoRevenue = (restaurantOrders || []).reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
       const fbRevenue = fbRoomRevenue + fbRestoRevenue
-      const otherRevenue = (purchases || []).reduce((s, p) => s + (parseFloat(p.total_price) || 0), 0)
+      const poolRevenue = (poolVisits || []).reduce((s, p) => s + (parseFloat(p.total_charge) || 0), 0) + 
+                          (poolOutside || []).reduce((s, p) => s + (parseFloat(p.total_charge) || 0), 0)
+      const otherRevenue = (purchases || []).reduce((s, p) => s + (parseFloat(p.total_price) || 0), 0) + poolRevenue
       const totalRevenue = roomRevenue + fbRevenue + otherRevenue
       const totalCheckouts = guestsData?.length || 0
       const totalGuests = (checkedInGuests?.length || 0) + totalCheckouts
@@ -172,6 +246,7 @@ export default function Sales() {
         categoryMap[cat] = (categoryMap[cat] || 0) + parseFloat(p.total_price || 0)
       })
       if (roomRevenue > 0) categoryMap['Room Charges'] = roomRevenue
+      if (poolRevenue > 0) categoryMap['Pool Access'] = poolRevenue
 
       const breakdown = Object.entries(categoryMap)
         .map(([name, value]) => ({ name, value }))
@@ -195,7 +270,7 @@ export default function Sales() {
           type: 'room',
           name: g.name_with_initials,
           amount: parseFloat(g.total_room_charge || 0),
-          date: g.date_of_departure,
+          date: g.first_invoice_downloaded_at || g.date_of_departure,
           label: `Room ${g.room_type} checkout`
         })),
         ...(fbConsumption || []).slice(0, 5).map(c => ({
@@ -221,36 +296,67 @@ export default function Sales() {
   const exportSalesData = async () => {
     setLoading(true)
     try {
-      const { from, to } = getPeriodDates(period, customFrom, customTo)
-      const toInclusive = to + 'T23:59:59'
+      const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo)
       const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
       const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
 
-      // ── Fetch data ──────────────────────────────────────────────────────────
-      const { data: guestsData } = await supabase
-        .from('guests')
-        .select('id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure')
-        .gte('date_of_departure', from)
-        .lte('date_of_departure', to)
-        .eq('status', 'checked_out')
+      // ── Fetch data (midnight-to-midnight, with legacy fallback) ─────────────
+      const EXPORT_FIELDS = 'id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure, first_invoice_downloaded_at'
+
+      const [{ data: expNewGuests }, { data: expLegacyGuests }] = await Promise.all([
+        supabase
+          .from('guests')
+          .select(EXPORT_FIELDS)
+          .not('first_invoice_downloaded_at', 'is', null)
+          .gte('first_invoice_downloaded_at', fromISO)
+          .lt('first_invoice_downloaded_at', toEndISO)
+          .eq('status', 'checked_out'),
+        supabase
+          .from('guests')
+          .select(EXPORT_FIELDS)
+          .is('first_invoice_downloaded_at', null)
+          .gte('date_of_departure', from)
+          .lte('date_of_departure', to)
+          .eq('status', 'checked_out'),
+      ])
+
+      const expSeenIds = new Set()
+      const guestsData = [...(expNewGuests || []), ...(expLegacyGuests || [])].filter(g => {
+        if (expSeenIds.has(g.id)) return false
+        expSeenIds.add(g.id)
+        return true
+      })
 
       const { data: fbData } = await supabase
         .from('fb_consumption')
         .select('total_price, item_name, quantity, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
-        .gte('consumed_at', from)
-        .lte('consumed_at', toInclusive)
+        .gte('consumed_at', fromISO)
+        .lt('consumed_at', toEndISO)
 
       const { data: restoData } = await supabase
         .from('restaurant_orders')
         .select('total_price, item_name, quantity')
-        .gte('created_at', from)
-        .lte('created_at', toInclusive)
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
 
       const { data: extraData } = await supabase
         .from('purchases')
         .select('total_price, item_name, category, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
-        .gte('purchase_date', from)
-        .lte('purchase_date', toInclusive)
+        .gte('purchase_date', fromISO)
+        .lt('purchase_date', toEndISO)
+
+      const { data: expPoolVisits } = await supabase
+        .from('pool_visits')
+        .select('total_charge, number_of_persons, guests!inner(room_numbers)')
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
+
+      const { data: expPoolOutside } = await supabase
+        .from('pool_outside_visitors')
+        .select('total_charge, number_of_persons, visitor_name')
+        .not('first_bill_downloaded_at', 'is', null)
+        .gte('first_bill_downloaded_at', fromISO)
+        .lt('first_bill_downloaded_at', toEndISO)
 
       // ── Colour palette ───────────────────────────────────────────────────────
       // Deep navy (header bg)
@@ -326,7 +432,9 @@ export default function Sales() {
       // ═══════════════════════════════════════════════════════════════════════
       const totalRooms = (guestsData || []).reduce((s, g) => s + parseFloat(g.total_room_charge || 0), 0)
       const totalFB    = [...(fbData || []), ...(restoData || [])].reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
-      const totalExtra = (extraData || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
+      const expPoolRev = (expPoolVisits || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0) + 
+                         (expPoolOutside || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0)
+      const totalExtra = (extraData || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0) + expPoolRev
       const grandTotal = totalRooms + totalFB + totalExtra
 
       const fmt = '#,##0.00'
@@ -368,8 +476,8 @@ export default function Sales() {
         ],
         // Extra row
         [
-          cell('Extra / Other', { bold: true, sz: 11, bgColor: GRN_LT, border: true }),
-          cell(extraData?.length || 0, { sz: 11, halign: 'center', bgColor: GRN_LT, border: true }),
+          cell('Extra / Other (inc. Pool)', { bold: true, sz: 11, bgColor: GRN_LT, border: true }),
+          cell((extraData?.length || 0) + (expPoolVisits?.length || 0) + (expPoolOutside?.length || 0), { sz: 11, halign: 'center', bgColor: GRN_LT, border: true }),
           cell(totalExtra, { bold: true, sz: 11, halign: 'right', bgColor: GRN_LT, numFmt: fmt, border: true }),
           cell(grandTotal > 0 ? +((totalExtra / grandTotal) * 100).toFixed(1) : 0, { sz: 11, halign: 'right', bgColor: GRN_LT, numFmt: '0.0"%"', border: true }),
           blank(GRN_LT), blank(GRN_LT),
@@ -525,16 +633,37 @@ export default function Sales() {
       })
 
       // ── Sheet 4: Extra Revenue ─────────────────────────────────────────────
-      const extraDataRows = (extraData || []).map(item => {
-        const g = item.guests || {}
-        return {
-          room:     (g.room_numbers || []).join(', '),
-          desc:     `${item.item_name || '—'} (${item.category || ''})`,
-          checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
-          checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
-          amount:   parseFloat(item.total_price || 0),
-        }
-      })
+      const extraDataRows = [
+        ...(extraData || []).map(item => {
+          const g = item.guests || {}
+          return {
+            room:     (g.room_numbers || []).join(', '),
+            desc:     `${item.item_name || '—'} (${item.category || ''})`,
+            checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+            checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+            amount:   parseFloat(item.total_price || 0),
+          }
+        }),
+        ...(expPoolVisits || []).map(item => {
+          const g = item.guests || {}
+          return {
+            room:     (g.room_numbers || []).join(', '),
+            desc:     `Pool Access (In-house) - ${item.number_of_persons} pax`,
+            checkIn:  '-',
+            checkOut: '-',
+            amount:   parseFloat(item.total_charge || 0),
+          }
+        }),
+        ...(expPoolOutside || []).map(item => {
+          return {
+            room:     '—',
+            desc:     `Pool Access (Outside: ${item.visitor_name}) - ${item.number_of_persons} pax`,
+            checkIn:  '-',
+            checkOut: '-',
+            amount:   parseFloat(item.total_charge || 0),
+          }
+        })
+      ]
 
       const wsExtra = buildDataSheet({
         title:       'Daily Revenue Summary — Extra / Other',

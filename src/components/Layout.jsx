@@ -17,7 +17,9 @@ import {
   Shield,
   User,
   Activity,
-  DollarSign
+  DollarSign,
+  Waves,
+  ChevronDown
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
@@ -27,6 +29,7 @@ import logo from '../Images/Untitled design (2).png'
 export default function Layout({ children }) {
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [servicesOpen, setServicesOpen] = useState(false)
 
   const { isDarkMode, toggleTheme } = useTheme()
   const { userProfile, isSuperAdmin, canManageUsers, canManageSystem, logout } = useAuth()
@@ -34,8 +37,16 @@ export default function Layout({ children }) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard, show: true },
     { name: 'Guests', href: '/guests', icon: Users, show: true },
-    { name: 'Rooms', href: '/rooms', icon: Building2, show: true },
-    { name: 'F & B', href: '/food-beverage', icon: Coffee, show: true },
+    { 
+      name: 'Services', 
+      icon: Building2, 
+      show: true,
+      children: [
+        { name: 'Rooms', href: '/rooms', icon: Building2, show: true },
+        { name: 'F & B', href: '/food-beverage', icon: Coffee, show: true },
+        { name: 'Pool', href: '/pool', icon: Waves, show: true },
+      ]
+    },
     { name: 'Forecast', href: '/forecast', icon: TrendingUp, show: true },
     { name: 'Sales', href: '/sales', icon: DollarSign, show: canManageUsers() },
     { name: 'Activity', href: '/activity', icon: Activity, show: canManageUsers() },
@@ -129,6 +140,50 @@ export default function Layout({ children }) {
           <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin">
             {navigation.filter(item => item.show).map((item) => {
               const Icon = item.icon
+              if (item.children) {
+                const isChildActive = item.children.some(child => isActive(child.href))
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      onClick={() => setServicesOpen(!servicesOpen)}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isChildActive
+                          ? 'bg-primary-50 text-primary-600 dark:bg-primary-900/20 dark:text-primary-400'
+                          : 'text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Icon size={20} />
+                        <span className="font-medium">{item.name}</span>
+                      </div>
+                      <ChevronDown size={16} className={`transition-transform duration-200 ${servicesOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {servicesOpen && (
+                      <div className="pl-11 pr-2 space-y-1">
+                        {item.children.map(child => {
+                          const ChildIcon = child.icon
+                          return (
+                            <Link
+                              key={child.name}
+                              to={child.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm ${
+                                isActive(child.href)
+                                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/20'
+                                  : 'text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-gray-200'
+                              }`}
+                            >
+                              <ChildIcon size={18} />
+                              <span className="font-medium">{child.name}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               return (
                 <Link
                   key={item.name}
