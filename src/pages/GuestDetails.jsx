@@ -23,8 +23,10 @@ import {
   AlertCircle,
   X,
   Percent,
-  Tag
+  Tag,
+  DollarSign
 } from 'lucide-react'
+import { formatUSD } from '../utils/currencyConverter'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import logo from '../Images/Untitled design (2).png'
@@ -543,9 +545,19 @@ export default function GuestDetails() {
       const advanceY = bill.tax > 0 ? finalY + 37 : finalY + 26
       doc.text('Advance Payment:', 130, advanceY)
       doc.text(formatCurrency(bill.advancePayment), 180, advanceY, { align: 'right' })
+      
+      if (guest.original_currency === 'USD' && guest.original_amount) {
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'italic')
+        doc.text(`(Converted from ${formatUSD(guest.original_amount)} @ 1 USD = ${guest.exchange_rate?.toFixed(2)} LKR)`, 180, advanceY + 4, { align: 'right' })
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+      }
+
       doc.setFont('helvetica', 'bold')
-      doc.text('Balance Due:', 130, advanceY + 8)
-      doc.text(formatCurrency(bill.balanceDue), 180, advanceY + 8, { align: 'right' })
+      const balanceY = (guest.original_currency === 'USD' && guest.original_amount) ? advanceY + 12 : advanceY + 8
+      doc.text('Balance Due:', 130, balanceY)
+      doc.text(formatCurrency(bill.balanceDue), 180, balanceY, { align: 'right' })
     }
 
     doc.setFont('helvetica', 'italic')
@@ -980,12 +992,31 @@ export default function GuestDetails() {
                 )}
                 {guest.advance_payment_amount > 0 && (
                   <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                    <p className="text-green-400 font-medium mb-3">Advance Payment Details</p>
+                    <p className="text-green-400 font-medium mb-3 flex items-center justify-between">
+                      <span>Advance Payment Details</span>
+                      {guest.original_currency === 'USD' && (
+                        <span className="flex items-center text-xs font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-400 border border-emerald-500/30">
+                          <DollarSign size={12} className="mr-1" /> USD Payment
+                        </span>
+                      )}
+                    </p>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-gray-400">Amount Paid</span>
+                        <span className="text-slate-500 dark:text-gray-400">Amount Paid (LKR)</span>
                         <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(guest.advance_payment_amount)}</span>
                       </div>
+                      {guest.original_currency === 'USD' && guest.original_amount && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500 dark:text-gray-400">Original Amount (USD)</span>
+                            <span className="text-emerald-400 font-bold">{formatUSD(guest.original_amount)}</span>
+                          </div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-slate-500 dark:text-gray-500">Exchange Rate</span>
+                            <span className="text-slate-500 dark:text-gray-500">1 USD = {guest.exchange_rate?.toFixed(2)} LKR</span>
+                          </div>
+                        </>
+                      )}
                       {guest.advance_payment_date && (
                         <div className="flex justify-between">
                           <span className="text-slate-500 dark:text-gray-400">Payment Date</span>
@@ -1225,7 +1256,14 @@ export default function GuestDetails() {
                 {bill.advancePayment > 0 && (
                   <>
                     <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
-                      <span className="text-slate-500 dark:text-gray-400">Advance Payment</span>
+                      <span className="text-slate-500 dark:text-gray-400 flex flex-col">
+                        <span>Advance Payment</span>
+                        {guest.original_currency === 'USD' && (
+                          <span className="text-[10px] text-emerald-400 font-bold uppercase">
+                            Converted from {formatUSD(guest.original_amount)}
+                          </span>
+                        )}
+                      </span>
                       <span className="text-green-400 font-medium">-{formatCurrency(bill.advancePayment)}</span>
                     </div>
                     <div className="flex justify-between py-3 bg-green-500/10 rounded-lg px-3">

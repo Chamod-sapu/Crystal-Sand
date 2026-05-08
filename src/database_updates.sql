@@ -91,3 +91,9 @@ ON pool_outside_visitors FOR ALL TO authenticated USING (true);
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS pool_price numeric DEFAULT 600;
 ALTER TABLE pool_visits ADD COLUMN IF NOT EXISTS number_of_hours integer DEFAULT 4;
 ALTER TABLE pool_outside_visitors ADD COLUMN IF NOT EXISTS number_of_hours integer DEFAULT 4;
+
+-- 10. Add currency conversion tracking columns for online booking payments (Booking.com/Agoda)
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS original_currency text DEFAULT NULL;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS original_amount numeric DEFAULT NULL;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS exchange_rate numeric DEFAULT NULL;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS booking_source text DEFAULT NULL;
