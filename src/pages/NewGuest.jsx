@@ -6,7 +6,8 @@ import { logActivity } from '../lib/activityLogger'
 import { generateGRCNumber } from '../utils/grcGenerator'
 import { calculateRoomCharges, calculateDynamicRoomCharges, formatCurrency } from '../utils/calculations'
 import { format, differenceInDays } from 'date-fns'
-import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2 } from 'lucide-react'
+import { Save, ArrowLeft, Plus, X, AlertCircle, Upload, FileText, Trash2, RefreshCw, DollarSign } from 'lucide-react'
+import { fetchUSDtoLKRRate, convertUSDtoLKR, formatUSD, formatLKR, clearCachedRate } from '../utils/currencyConverter'
 
 export default function NewGuest() {
   const navigate = useNavigate()
@@ -26,6 +27,10 @@ export default function NewGuest() {
   const [registrationType, setRegistrationType] = useState('checkin')
   const [onlineBookingType, setOnlineBookingType] = useState('')
   const [travellingAgentName, setTravellingAgentName] = useState('')
+  const [exchangeRateData, setExchangeRateData] = useState(null)
+  const [usdAmount, setUsdAmount] = useState('')
+  const [rateLoading, setRateLoading] = useState(false)
+  const [rateError, setRateError] = useState('')
   const [countries, setCountries] = useState([
     'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola',
     'Antigua and Barbuda', 'Argentina', 'Armenia', 'Australia', 'Austria',
@@ -109,6 +114,46 @@ export default function NewGuest() {
       validateField('mobile_number', formData.mobile_number)
     }
   }, [formData.nationality])
+
+  // Fetch exchange rate when Booking.com or Agoda is selected
+  const isOnlinePlatformBooking = registrationType === 'online_booking' && 
+    (onlineBookingType === 'agoda' || onlineBookingType === 'booking_com')
+
+  useEffect(() => {
+    if (isOnlinePlatformBooking) {
+      loadExchangeRate()
+    }
+  }, [isOnlinePlatformBooking])
+
+  async function loadExchangeRate(forceRefresh = false) {
+    setRateLoading(true)
+    setRateError('')
+    try {
+      if (forceRefresh) clearCachedRate()
+      const data = await fetchUSDtoLKRRate()
+      setExchangeRateData(data)
+      // Re-convert if there's already a USD amount entered
+      if (usdAmount && data.rate) {
+        const lkrValue = convertUSDtoLKR(usdAmount, data.rate)
+        setFormData(prev => ({ ...prev, advance_payment_amount: lkrValue }))
+      }
+    } catch (err) {
+      setRateError('Failed to fetch exchange rate')
+      console.error('Exchange rate error:', err)
+    } finally {
+      setRateLoading(false)
+    }
+  }
+
+  function handleUsdAmountChange(value) {
+    setUsdAmount(value)
+    if (exchangeRateData?.rate && value) {
+      const lkrValue = convertUSDtoLKR(value, exchangeRateData.rate)
+      setFormData(prev => ({ ...prev, advance_payment_amount: lkrValue }))
+    } else if (!value) {
+      setFormData(prev => ({ ...prev, advance_payment_amount: 0 }))
+    }
+  }
 
   async function loadData() {
     try {
@@ -559,9 +604,14 @@ export default function NewGuest() {
           voucher_number: formData.voucher_number || null,
           passport_nic_document_url: documentUrl || null,
           total_room_charge: totalRoomCharge,
-          room_occupancies: formData.room_occupancies, // Store the occupancy breakdown
+          room_occupancies: formData.room_occupancies,
           number_of_nights: numberOfNights,
           status: guestStatus,
+          // Currency conversion metadata for online bookings
+          original_currency: isOnlinePlatformBooking && usdAmount ? 'USD' : null,
+          original_amount: isOnlinePlatformBooking && usdAmount ? parseFloat(usdAmount) : null,
+          exchange_rate: isOnlinePlatformBooking && exchangeRateData?.rate ? exchangeRateData.rate : null,
+          booking_source: registrationType === 'online_booking' ? onlineBookingType : null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -1330,6 +1380,131 @@ export default function NewGuest() {
             <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">5</span>
             <span>Advance Payment (Optional)</span>
           </h2>
+
+          {/* USD to LKR Converter - shows only for Booking.com/Agoda */}
+          {isOnlinePlatformBooking && (
+            <div className="mb-6 p-5 rounded-xl border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 via-emerald-600/10 to-teal-500/5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
+                    <DollarSign size={18} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">USD → LKR Converter</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-gray-400 uppercase tracking-wider">
+                      {onlineBookingType === 'agoda' ? 'Agoda' : 'Booking.com'} payment in USD
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadExchangeRate(true)}
+                  disabled={rateLoading}
+                  className="flex items-center space-x-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 transition-all disabled:opacity-50"
+                  title="Refresh exchange rate"
+                >
+                  <RefreshCw size={12} className={rateLoading ? 'animate-spin' : ''} />
+                  <span>{rateLoading ? 'Loading...' : 'Refresh Rate'}</span>
+                </button>
+              </div>
+
+              {/* Exchange Rate Display */}
+              {exchangeRateData && (
+                <div className="flex items-center space-x-3 mb-4 p-3 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                  <div className="flex-1">
+                    <div className="flex items-baseline space-x-2">
+                      <span className="text-2xl font-bold text-emerald-400">1 USD</span>
+                      <span className="text-slate-400">=</span>
+                      <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {exchangeRateData.rate?.toFixed(2)} LKR
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                        exchangeRateData.isFallback 
+                          ? 'bg-amber-500/20 text-amber-400' 
+                          : exchangeRateData.cached 
+                          ? 'bg-blue-500/20 text-blue-400' 
+                          : 'bg-emerald-500/20 text-emerald-400'
+                      }`}>
+                        {exchangeRateData.isFallback ? '⚠ Offline' : exchangeRateData.cached ? '● Cached' : '● Live'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 dark:text-gray-500">
+                        {exchangeRateData.source} • {exchangeRateData.lastUpdated}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {rateError && (
+                <div className="mb-4 p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center space-x-2">
+                  <AlertCircle size={14} />
+                  <span>{rateError}</span>
+                </div>
+              )}
+
+              {/* USD Input → LKR Output */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="label flex items-center space-x-1">
+                    <DollarSign size={14} className="text-emerald-400" />
+                    <span>Payment in USD</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 font-bold text-sm">$</span>
+                    <input
+                      type="number"
+                      value={usdAmount}
+                      onChange={(e) => handleUsdAmountChange(e.target.value)}
+                      className="input-field pl-8 border-emerald-500/30 focus:ring-emerald-500"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      disabled={loading || !exchangeRateData}
+                    />
+                  </div>
+                  {usdAmount && (
+                    <p className="text-xs text-emerald-400 mt-1 font-medium">
+                      {formatUSD(parseFloat(usdAmount) || 0)}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="label">Converted to LKR</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-400 font-bold text-sm">Rs.</span>
+                    <input
+                      type="text"
+                      value={usdAmount && exchangeRateData?.rate 
+                        ? convertUSDtoLKR(usdAmount, exchangeRateData.rate).toLocaleString('en-LK', { minimumFractionDigits: 2 })
+                        : '0.00'}
+                      className="input-field pl-10 bg-slate-100 dark:bg-slate-800 font-bold text-primary-500"
+                      readOnly
+                    />
+                  </div>
+                  {usdAmount && exchangeRateData?.rate && (
+                    <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">
+                      Auto-applied as advance payment below
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {usdAmount && exchangeRateData?.rate && (
+                <div className="mt-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <p className="text-xs text-emerald-400 text-center">
+                    <span className="font-bold">{formatUSD(parseFloat(usdAmount))}</span>
+                    {' × '}
+                    <span className="font-bold">{exchangeRateData.rate.toFixed(2)}</span>
+                    {' = '}
+                    <span className="font-bold">{formatLKR(convertUSDtoLKR(usdAmount, exchangeRateData.rate))}</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label className="label">Advance Amount (LKR)</label>
@@ -1337,12 +1512,21 @@ export default function NewGuest() {
                 type="number"
                 name="advance_payment_amount"
                 value={formData.advance_payment_amount}
-                onChange={handleChange}
+                onChange={(e) => {
+                  handleChange(e)
+                  // If user manually edits LKR while converter is active, clear USD
+                  if (isOnlinePlatformBooking) setUsdAmount('')
+                }}
                 className="input-field"
                 min="0"
                 step="100"
                 disabled={loading}
               />
+              {isOnlinePlatformBooking && usdAmount && (
+                <p className="text-[10px] text-emerald-400 mt-1 font-medium uppercase tracking-wider">
+                  Converted from {formatUSD(parseFloat(usdAmount))}
+                </p>
+              )}
             </div>
             <div>
               <label className="label">Payment Date</label>

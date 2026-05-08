@@ -152,7 +152,7 @@ export default function Sales() {
           .not('first_invoice_downloaded_at', 'is', null)
           .gte('first_invoice_downloaded_at', fromISO)
           .lt('first_invoice_downloaded_at', toEndISO)
-          .eq('status', 'checked_out'),
+          .in('status', ['checked_in', 'checked_out']),
         supabase
           .from('guests')
           .select(GUEST_FIELDS)
@@ -310,7 +310,7 @@ export default function Sales() {
           .not('first_invoice_downloaded_at', 'is', null)
           .gte('first_invoice_downloaded_at', fromISO)
           .lt('first_invoice_downloaded_at', toEndISO)
-          .eq('status', 'checked_out'),
+          .in('status', ['checked_in', 'checked_out']),
         supabase
           .from('guests')
           .select(EXPORT_FIELDS)

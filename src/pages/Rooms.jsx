@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase'
 import { logActivity } from '../lib/activityLogger'
 import { useAuth } from '../context/AuthContext'
 import { formatCurrency, calculateBillTotal, calculateDynamicRoomCharges } from '../utils/calculations'
-import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag, DollarSign } from 'lucide-react'
 import { format, addDays, differenceInDays } from 'date-fns'
+import { formatUSD } from '../utils/currencyConverter'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import logo from '../Images/Untitled design (2).png'
@@ -268,6 +269,7 @@ export default function Rooms() {
     const additionalCharge = newTotalRoomCharge - parseFloat(selectedGuestPopup.total_room_charge)
     const effectiveNights = selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)
     const additionalNights = newNights - effectiveNights
+    const pricePerNight = additionalNights > 0 ? additionalCharge / (additionalNights * selectedGuestPopup.room_numbers.length) : 0
 
     setExtendPreview({
       currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -641,8 +643,27 @@ export default function Rooms() {
     }
   }
 
-  const generateRoomBillPDF = (guestToPrint = selectedGuestPopup) => {
+  const generateRoomBillPDF = async (guestToPrint = selectedGuestPopup) => {
     if (!guestToPrint) return
+
+    // Record first invoice download timestamp (marks the sale moment)
+    if (!guestToPrint.first_invoice_downloaded_at) {
+      const now = new Date().toISOString()
+      const { error } = await supabase
+        .from('guests')
+        .update({ first_invoice_downloaded_at: now })
+        .eq('id', guestToPrint.id)
+
+      if (!error) {
+        guestToPrint.first_invoice_downloaded_at = now
+        // Update it in the local state if it's the currently selected guest
+        if (selectedGuestPopup && selectedGuestPopup.id === guestToPrint.id) {
+          setSelectedGuestPopup({ ...selectedGuestPopup, first_invoice_downloaded_at: now })
+        }
+        // Also update the guests list
+        setGuests(guests.map(g => g.id === guestToPrint.id ? { ...g, first_invoice_downloaded_at: now } : g))
+      }
+    }
 
     const doc = new jsPDF()
     const cyanColor = [8, 145, 178]
@@ -697,15 +718,27 @@ export default function Rooms() {
     const advancePaid = guestToPrint.advance_payment_amount || 0
     const totalDue = Math.max(0, roomCharge - advancePaid)
 
+    const tableBody = [
+      ['Total Room Charge', formatCurrency(roomCharge)],
+      ['Advance Payment', { content: formatCurrency(advancePaid), styles: { textColor: [0, 150, 0] } }]
+    ]
+
+    if (guestToPrint.original_currency === 'USD' && guestToPrint.original_amount) {
+      tableBody.push([
+        { content: `(Converted from ${formatUSD(guestToPrint.original_amount)} @ 1 USD = ${guestToPrint.exchange_rate?.toFixed(2)} LKR)`, styles: { fontSize: 8, fontStyle: 'italic', textColor: [100, 100, 100] } },
+        ''
+      ])
+    }
+
+    tableBody.push([
+      { content: 'Total Balance Due', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, 
+      { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+    ])
+
     doc.autoTable({
       startY: doc.lastAutoTable.finalY + 10,
       head: [['Description', 'Amount (LKR)']],
-      body: [
-        ['Total Room Charge', formatCurrency(roomCharge)],
-        ['Advance Payment', `-${formatCurrency(advancePaid)}`],
-        [{ content: 'Total Balance Due', styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }, 
-         { content: formatCurrency(totalDue), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }]
-      ],
+      body: tableBody,
       theme: 'grid',
       headStyles: { fillColor: cyanColor, textColor: 255 },
       styles: { fontSize: 10 }
@@ -1476,9 +1509,17 @@ export default function Rooms() {
                           <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
                         </div>
                         {selectedGuestPopup.advance_payment_amount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-slate-500 dark:text-gray-400">Advance Paid</span>
-                            <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
+                          <div className="space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 dark:text-gray-400">Advance Paid (LKR)</span>
+                              <span className="text-green-400 font-medium">-{formatCurrency(selectedGuestPopup.advance_payment_amount)}</span>
+                            </div>
+                            {selectedGuestPopup.original_currency === 'USD' && (
+                              <div className="flex justify-between text-[10px]">
+                                <span className="text-emerald-400 font-bold uppercase">Original: {formatUSD(selectedGuestPopup.original_amount)}</span>
+                                <span className="text-gray-500 italic">Rate: {selectedGuestPopup.exchange_rate?.toFixed(2)}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div className="flex justify-between pt-2 border-t border-primary-600/20">
