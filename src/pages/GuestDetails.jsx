@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { formatCurrency, calculateBillTotal, calculateDiscountInfo, calculateDynamicRoomCharges } from '../utils/calculations'
+import { formatCurrency, calculateBillTotal, calculateDiscountInfo } from '../utils/calculations'
 import { format, differenceInDays, addDays, parseISO } from 'date-fns'
 import {
   ArrowLeft,
@@ -23,10 +23,8 @@ import {
   AlertCircle,
   X,
   Percent,
-  Tag,
-  DollarSign
+  Tag
 } from 'lucide-react'
-import { formatUSD } from '../utils/currencyConverter'
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
 import logo from '../Images/Untitled design (2).png'
@@ -36,7 +34,6 @@ export default function GuestDetails() {
   const navigate = useNavigate()
   const [guest, setGuest] = useState(null)
   const [purchases, setPurchases] = useState([])
-  const [poolVisits, setPoolVisits] = useState([])
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showAddPurchase, setShowAddPurchase] = useState(false)
@@ -47,9 +44,6 @@ export default function GuestDetails() {
     quantity: 1,
     unit_price: 0
   })
-
-  const [roomPricing, setRoomPricing] = useState([])
-  const [allRooms, setAllRooms] = useState([])
 
   const [showExtendStay, setShowExtendStay] = useState(false)
   const [extendDate, setExtendDate] = useState('')
@@ -64,15 +58,7 @@ export default function GuestDetails() {
   useEffect(() => {
     loadGuestData()
     loadSettings()
-    loadPricingData()
   }, [id])
-
-  async function loadPricingData() {
-    const { data: pricing } = await supabase.from('room_pricing').select('*')
-    const { data: rooms } = await supabase.from('rooms').select('*')
-    setRoomPricing(pricing || [])
-    setAllRooms(rooms || [])
-  }
 
   useEffect(() => {
     if (extendDate && guest) {
@@ -96,15 +82,8 @@ export default function GuestDetails() {
         .eq('guest_id', id)
         .order('purchase_date', { ascending: false })
 
-      const { data: poolData } = await supabase
-        .from('pool_visits')
-        .select('*')
-        .eq('guest_id', id)
-        .order('created_at', { ascending: false })
-
       setGuest(guestData)
       setPurchases(purchasesData || [])
-      setPoolVisits(poolData || [])
 
       if (guestData.passport_nic_document_url) {
         const { data, error } = await supabase.storage
@@ -210,33 +189,27 @@ export default function GuestDetails() {
     const arrival = new Date(guest.date_of_arrival)
     let newNights = differenceInDays(newDepartureDate, arrival)
     
+    // For same-day bookings, newNights should be at least 1
     if (newNights === 0 && guest.date_of_arrival === extendDate) {
       newNights = 1
     }
     
-    // Calculate new total using dynamic pricing
-    const newTotalRoomCharge = guest.room_numbers.reduce((total, roomNum) => {
-      const roomObj = allRooms.find(r => r.room_number === roomNum)
-      const roomNumInt = parseInt(roomNum)
-      const roomGroup = [1,2,3,5,6,7].includes(roomNumInt) ? 'A' : 'B'
-      const occupancy = guest.room_occupancies?.[roomNum] || 1
-      
-      const roomCharge = calculateDynamicRoomCharges(
-        guest.date_of_arrival,
-        extendDate,
-        roomPricing,
-        roomGroup,
-        occupancy,
-        roomObj?.base_price || 0,
-        guest.stay_type
-      )
-      return total + roomCharge
-    }, 0)
-
-    const additionalCharge = newTotalRoomCharge - parseFloat(guest.total_room_charge)
+    // If extending from same-day (which was 1 night) to 1-night stay (which is also 1 night), additionalNights is 0
+    let additionalNights = differenceInDays(newDepartureDate, currentDeparture)
+    if (guest.date_of_arrival === guest.date_of_departure) {
+      // It was a same-day room booking
+      if (newDepartureDate > currentDeparture) {
+        // If extending to next day, additional nights should be (total new nights - 1)
+        additionalNights = Math.max(0, newNights - 1)
+      }
+    }
+    
+    const numberOfRooms = guest.room_numbers.length
+    // Fallback for number_of_nights if it's 0 (legacy same-day bookings)
     const effectiveNights = guest.number_of_nights || (guest.date_of_arrival === guest.date_of_departure ? 1 : 0)
-    const additionalNights = newNights - effectiveNights
-    const pricePerNight = additionalNights > 0 ? additionalCharge / (additionalNights * guest.room_numbers.length) : 0
+    const pricePerNight = parseFloat(guest.total_room_charge) / (effectiveNights * numberOfRooms) || 0
+    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
+    const newTotalRoomCharge = parseFloat(guest.total_room_charge) + additionalCharge
 
     setExtendPreview({
       currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -373,9 +346,37 @@ export default function GuestDetails() {
     if (!confirm('Are you sure you want to check out this guest?')) return
 
     try {
+      const todayStr = format(new Date(), 'yyyy-MM-dd')
+      const originalDepartureStr = guest.date_of_departure
+      
+      let updateData = { 
+        status: 'checked_out',
+        updated_at: new Date().toISOString()
+      }
+
+      if (todayStr < originalDepartureStr) {
+        // Early checkout
+        const arrivalDate = new Date(guest.date_of_arrival)
+        const todayDate = new Date(todayStr)
+        let actualNights = differenceInDays(todayDate, arrivalDate)
+        
+        if (actualNights <= 0) actualNights = 1 // Minimum 1 night if same-day checkout
+        
+        const originalNights = guest.number_of_nights || 1
+        const pricePerNight = parseFloat(guest.total_room_charge) / originalNights
+        
+        const newTotalRoomCharge = pricePerNight * actualNights
+
+        updateData.date_of_departure = todayStr
+        updateData.number_of_nights = actualNights
+        updateData.total_room_charge = newTotalRoomCharge
+        
+        alert(`Early checkout detected. Bill has been recalculated for ${actualNights} night(s).`)
+      }
+
       const { error } = await supabase
         .from('guests')
-        .update({ status: 'checked_out' })
+        .update(updateData)
         .eq('id', id)
 
       if (error) throw error
@@ -388,7 +389,9 @@ export default function GuestDetails() {
       }
 
       loadGuestData()
-      alert('Guest checked out successfully')
+      if (!updateData.date_of_departure) {
+        alert('Guest checked out successfully')
+      }
     } catch (error) {
       console.error('Error checking out:', error)
       alert('Failed to check out guest')
@@ -407,21 +410,8 @@ export default function GuestDetails() {
     )
   }
 
-  async function generateInvoicePDF() {
+  function generateInvoicePDF() {
     if (!guest || !settings) return
-
-    // Record first invoice download timestamp (marks the sale moment)
-    if (!guest.first_invoice_downloaded_at) {
-      const now = new Date().toISOString()
-      const { error } = await supabase
-        .from('guests')
-        .update({ first_invoice_downloaded_at: now })
-        .eq('id', id)
-
-      if (!error) {
-        setGuest(prev => ({ ...prev, first_invoice_downloaded_at: now }))
-      }
-    }
 
     const discountInfo = getDiscountInfo(guest)
 
@@ -430,8 +420,7 @@ export default function GuestDetails() {
       purchases,
       settings.tax_percentage,
       guest.advance_payment_amount,
-      discountInfo,
-      poolVisits
+      discountInfo
     )
 
     const doc = new jsPDF()
@@ -499,15 +488,6 @@ export default function GuestDetails() {
       ])
     })
 
-    poolVisits.forEach(visit => {
-      tableData.push([
-        `Pool Access (${visit.number_of_hours || 4} hours)`,
-        visit.number_of_persons.toString(),
-        formatCurrency(visit.charge_per_person),
-        formatCurrency(visit.total_charge)
-      ])
-    })
-
     doc.autoTable({
       startY: 111,
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
@@ -545,19 +525,9 @@ export default function GuestDetails() {
       const advanceY = bill.tax > 0 ? finalY + 37 : finalY + 26
       doc.text('Advance Payment:', 130, advanceY)
       doc.text(formatCurrency(bill.advancePayment), 180, advanceY, { align: 'right' })
-      
-      if (guest.original_currency === 'USD' && guest.original_amount) {
-        doc.setFontSize(8)
-        doc.setFont('helvetica', 'italic')
-        doc.text(`(Converted from ${formatUSD(guest.original_amount)} @ 1 USD = ${guest.exchange_rate?.toFixed(2)} LKR)`, 180, advanceY + 4, { align: 'right' })
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-      }
-
       doc.setFont('helvetica', 'bold')
-      const balanceY = (guest.original_currency === 'USD' && guest.original_amount) ? advanceY + 12 : advanceY + 8
-      doc.text('Balance Due:', 130, balanceY)
-      doc.text(formatCurrency(bill.balanceDue), 180, balanceY, { align: 'right' })
+      doc.text('Balance Due:', 130, advanceY + 8)
+      doc.text(formatCurrency(bill.balanceDue), 180, advanceY + 8, { align: 'right' })
     }
 
     doc.setFont('helvetica', 'italic')
@@ -592,8 +562,7 @@ export default function GuestDetails() {
     purchases,
     settings.tax_percentage,
     guest.advance_payment_amount,
-    discountInfo,
-    poolVisits
+    discountInfo
   ) : null
 
   return (
@@ -881,34 +850,18 @@ export default function GuestDetails() {
               </div>
               <div className="space-y-4">
                 <div>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room(s) & Occupancy</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Numbers</p>
                   <div className="flex flex-wrap gap-2 mt-1">
                     {guest.room_numbers.map(room => (
-                      <div key={room} className="flex flex-col">
-                        <span className="px-3 py-1 bg-primary-600 rounded-lg text-white font-medium text-center">
-                          {room}
-                        </span>
-                        {guest.room_occupancies?.[room] && (
-                          <span className="text-[10px] text-center text-slate-500 mt-0.5">
-                            {guest.room_occupancies[room]} {guest.room_occupancies[room] === 1 ? 'Guest' : 'Guests'}
-                          </span>
-                        )}
-                      </div>
+                      <span key={room} className="px-3 py-1 bg-primary-600 rounded-lg text-white font-medium">
+                        {room}
+                      </span>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Type & Stay</p>
-                  <p className="text-slate-900 dark:text-white font-medium">
-                    {guest.room_type} 
-                    <span className={`ml-2 px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      guest.stay_type === 'day' 
-                        ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' 
-                        : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                    }`}>
-                      {guest.stay_type === 'day' ? 'Day Use' : 'Night Stay'}
-                    </span>
-                  </p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm">Room Type</p>
+                  <p className="text-slate-900 dark:text-white font-medium">{guest.room_type}</p>
                 </div>
                 <div>
                   <p className="text-slate-500 dark:text-gray-400 text-sm">Guests</p>
@@ -992,31 +945,12 @@ export default function GuestDetails() {
                 )}
                 {guest.advance_payment_amount > 0 && (
                   <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-                    <p className="text-green-400 font-medium mb-3 flex items-center justify-between">
-                      <span>Advance Payment Details</span>
-                      {guest.original_currency === 'USD' && (
-                        <span className="flex items-center text-xs font-bold bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-400 border border-emerald-500/30">
-                          <DollarSign size={12} className="mr-1" /> USD Payment
-                        </span>
-                      )}
-                    </p>
+                    <p className="text-green-400 font-medium mb-3">Advance Payment Details</p>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-gray-400">Amount Paid (LKR)</span>
+                        <span className="text-slate-500 dark:text-gray-400">Amount Paid</span>
                         <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(guest.advance_payment_amount)}</span>
                       </div>
-                      {guest.original_currency === 'USD' && guest.original_amount && (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500 dark:text-gray-400">Original Amount (USD)</span>
-                            <span className="text-emerald-400 font-bold">{formatUSD(guest.original_amount)}</span>
-                          </div>
-                          <div className="flex justify-between text-[10px]">
-                            <span className="text-slate-500 dark:text-gray-500">Exchange Rate</span>
-                            <span className="text-slate-500 dark:text-gray-500">1 USD = {guest.exchange_rate?.toFixed(2)} LKR</span>
-                          </div>
-                        </>
-                      )}
                       {guest.advance_payment_date && (
                         <div className="flex justify-between">
                           <span className="text-slate-500 dark:text-gray-400">Payment Date</span>
@@ -1224,12 +1158,6 @@ export default function GuestDetails() {
                     <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.otherPurchasesTotal)}</span>
                   </div>
                 )}
-                {bill.poolTotal > 0 && (
-                  <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
-                    <span className="text-slate-500 dark:text-gray-400">Pool Access</span>
-                    <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(bill.poolTotal)}</span>
-                  </div>
-                )}
                 {bill.purchasesTotal === 0 && (
                   <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
                     <span className="text-slate-500 dark:text-gray-400">Additional Purchases</span>
@@ -1256,14 +1184,7 @@ export default function GuestDetails() {
                 {bill.advancePayment > 0 && (
                   <>
                     <div className="flex justify-between py-2 border-b border-slate-200 dark:border-slate-800">
-                      <span className="text-slate-500 dark:text-gray-400 flex flex-col">
-                        <span>Advance Payment</span>
-                        {guest.original_currency === 'USD' && (
-                          <span className="text-[10px] text-emerald-400 font-bold uppercase">
-                            Converted from {formatUSD(guest.original_amount)}
-                          </span>
-                        )}
-                      </span>
+                      <span className="text-slate-500 dark:text-gray-400">Advance Payment</span>
                       <span className="text-green-400 font-medium">-{formatCurrency(bill.advancePayment)}</span>
                     </div>
                     <div className="flex justify-between py-3 bg-green-500/10 rounded-lg px-3">
