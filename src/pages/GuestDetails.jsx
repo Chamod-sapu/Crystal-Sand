@@ -410,8 +410,21 @@ export default function GuestDetails() {
     )
   }
 
-  function generateInvoicePDF() {
+  async function generateInvoicePDF() {
     if (!guest || !settings) return
+
+    // Record first invoice download timestamp (marks the sale moment)
+    if (!guest.first_invoice_downloaded_at) {
+      const now = new Date().toISOString()
+      const { error } = await supabase
+        .from('guests')
+        .update({ first_invoice_downloaded_at: now })
+        .eq('id', guest.id)
+
+      if (!error) {
+        setGuest(prev => prev ? { ...prev, first_invoice_downloaded_at: now } : null)
+      }
+    }
 
     const discountInfo = getDiscountInfo(guest)
 
