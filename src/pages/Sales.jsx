@@ -159,7 +159,7 @@ export default function Sales() {
           .is('first_invoice_downloaded_at', null)
           .gte('date_of_departure', from)
           .lte('date_of_departure', to)
-          .eq('status', 'checked_out'),
+          .in('status', ['checked_in', 'checked_out']),
       ])
 
       // Merge & deduplicate by id
@@ -195,12 +195,12 @@ export default function Sales() {
         .gte('created_at', fromISO)
         .lt('created_at', toEndISO)
 
-      // 4. Other purchases — midnight-to-midnight
+      // 4. Other purchases — filter by purchase_date (date column)
       const { data: purchases } = await supabase
         .from('purchases')
         .select('total_price, category, item_name, purchase_date')
-        .gte('purchase_date', fromISO)
-        .lt('purchase_date', toEndISO)
+        .gte('purchase_date', from)
+        .lte('purchase_date', to)
 
       // 5. Pool visits (in-house) — midnight-to-midnight
       const { data: poolVisits } = await supabase
@@ -238,8 +238,8 @@ export default function Sales() {
         const cat = c.category || 'F&B (Room)'
         categoryMap[cat] = (categoryMap[cat] || 0) + parseFloat(c.total_price || 0)
       })
-      ;(restaurantOrders || []).forEach(() => {
-        categoryMap['Restaurant'] = (categoryMap['Restaurant'] || 0) + fbRestoRevenue
+      ;(restaurantOrders || []).forEach(o => {
+        categoryMap['Restaurant'] = (categoryMap['Restaurant'] || 0) + parseFloat(o.total_price || 0)
       })
       ;(purchases || []).forEach(p => {
         const cat = p.category.charAt(0).toUpperCase() + p.category.slice(1)
@@ -317,7 +317,7 @@ export default function Sales() {
           .is('first_invoice_downloaded_at', null)
           .gte('date_of_departure', from)
           .lte('date_of_departure', to)
-          .eq('status', 'checked_out'),
+          .in('status', ['checked_in', 'checked_out']),
       ])
 
       const expSeenIds = new Set()
@@ -329,7 +329,7 @@ export default function Sales() {
 
       const { data: fbData } = await supabase
         .from('fb_consumption')
-        .select('total_price, item_name, quantity, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
+        .select('total_price, item_name, quantity, guests(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
         .gte('consumed_at', fromISO)
         .lt('consumed_at', toEndISO)
 
@@ -341,9 +341,9 @@ export default function Sales() {
 
       const { data: extraData } = await supabase
         .from('purchases')
-        .select('total_price, item_name, category, guests!inner(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
-        .gte('purchase_date', fromISO)
-        .lt('purchase_date', toEndISO)
+        .select('total_price, item_name, category, guests(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
+        .gte('purchase_date', from)
+        .lte('purchase_date', to)
 
       const { data: expPoolVisits } = await supabase
         .from('pool_visits')
