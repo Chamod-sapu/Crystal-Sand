@@ -21,6 +21,7 @@ import XLSX from 'xlsx-js-style'
 const PERIOD_OPTIONS = [
   { label: 'Today', value: 'today' },
   { label: 'Yesterday', value: 'yesterday' },
+  { label: 'Single Date', value: 'single' },
   { label: 'Last 3 Days', value: '3days' },
   { label: 'Last 7 Days', value: '7days' },
   { label: 'Last 30 Days', value: '30days' },
@@ -29,9 +30,7 @@ const PERIOD_OPTIONS = [
   { label: 'Custom Range', value: 'custom' },
 ]
 
-// Returns midnight-to-midnight ISO timestamps for the selected period
-// e.g. "today" = 2026-05-05T00:00:00 to 2026-05-06T00:00:00
-function getPeriodDates(period, customFrom, customTo) {
+function getPeriodDates(period, customFrom, customTo, singleDate) {
   const now = new Date()
   let fromDate, toDate
 
@@ -46,6 +45,10 @@ function getPeriodDates(period, customFrom, customTo) {
       toDate = startOfDay(yesterday)
       break
     }
+    case 'single':
+      fromDate = startOfDay(new Date(singleDate))
+      toDate = startOfDay(new Date(singleDate))
+      break
     case '3days':
       fromDate = startOfDay(subDays(now, 2))
       toDate = startOfDay(now)
@@ -114,6 +117,7 @@ export default function Sales() {
   const [period, setPeriod] = useState('today')
   const [customFrom, setCustomFrom] = useState(format(subDays(new Date(), 29), 'yyyy-MM-dd'))
   const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'))
+  const [singleDate, setSingleDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -133,11 +137,11 @@ export default function Sales() {
 
   useEffect(() => {
     loadSalesData()
-  }, [period, customFrom, customTo])
+  }, [period, customFrom, customTo, singleDate])
 
   async function loadSalesData() {
     setLoading(true)
-    const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo)
+    const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo, singleDate)
 
     try {
       // 1. Room Revenue — two-query approach for backwards compatibility:
@@ -296,7 +300,7 @@ export default function Sales() {
   const exportSalesData = async () => {
     setLoading(true)
     try {
-      const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo)
+      const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo, singleDate)
       const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
       const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
 
@@ -768,6 +772,22 @@ export default function Sales() {
             <div className="flex-1 sm:flex-none">
               <label className="label">To</label>
               <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="input-field" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Date Picker */}
+      {period === 'single' && (
+        <div className="card p-4 flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="flex items-center space-x-2">
+            <Filter size={18} className="text-primary-400 flex-shrink-0" />
+            <span className="text-sm font-medium text-slate-700 dark:text-gray-300">Single Date Filter</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+            <div className="flex-1 sm:flex-none">
+              <label className="label">Select Date</label>
+              <input type="date" value={singleDate} onChange={e => setSingleDate(e.target.value)} className="input-field" />
             </div>
           </div>
         </div>
