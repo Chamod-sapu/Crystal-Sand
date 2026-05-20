@@ -144,43 +144,27 @@ export default function Sales() {
     const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo, singleDate)
 
     try {
-      // 1. Room Revenue — use date_of_arrival as the primary reference date,
-      //    matching the manual report which records sales on the check-in date.
-      //    Guests with first_invoice_downloaded_at set are confirmed sales (invoice issued);
-      //    guests without it are included if they are checked_in/checked_out on that arrival date.
+      // 1. Room Revenue — sale is recognized at the moment of first invoice/bill download.
+      //    Filter by first_invoice_downloaded_at within the midnight-to-midnight local time window.
+      //    Guests without a downloaded invoice are NOT counted as sales yet.
       const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at'
 
-      const [{ data: invoicedGuests }, { data: noInvoiceGuests }] = await Promise.all([
-        // Guests who have had their invoice downloaded — filter by arrival date
-        supabase
-          .from('guests')
-          .select(GUEST_FIELDS)
-          .not('first_invoice_downloaded_at', 'is', null)
-          .gte('date_of_arrival', from)
-          .lte('date_of_arrival', to)
-          .in('status', ['checked_in', 'checked_out']),
-        // Guests without invoice yet — also filter by arrival date
-        supabase
-          .from('guests')
-          .select(GUEST_FIELDS)
-          .is('first_invoice_downloaded_at', null)
-          .gte('date_of_arrival', from)
-          .lte('date_of_arrival', to)
-          .in('status', ['checked_in', 'checked_out']),
-      ])
-      const newGuests = invoicedGuests
-      const legacyGuests = noInvoiceGuests
+      const { data: guestsRaw } = await supabase
+        .from('guests')
+        .select(GUEST_FIELDS)
+        .not('first_invoice_downloaded_at', 'is', null)
+        .gte('first_invoice_downloaded_at', fromISO)
+        .lt('first_invoice_downloaded_at', toEndISO)
+        .in('status', ['checked_in', 'checked_out'])
 
-      // Merge & deduplicate by id
+      // Deduplicate by id
       const seenIds = new Set()
-      const guestsData = [...(newGuests || []), ...(legacyGuests || [])].filter(g => {
+      const guestsData = (guestsRaw || []).filter(g => {
         if (seenIds.has(g.id)) return false
         seenIds.add(g.id)
         return true
       }).sort((a, b) => {
-        const aDate = a.date_of_arrival || a.date_of_departure
-        const bDate = b.date_of_arrival || b.date_of_departure
-        return new Date(bDate) - new Date(aDate)
+        return new Date(b.first_invoice_downloaded_at) - new Date(a.first_invoice_downloaded_at)
       })
 
       // Also get checked-in guests for count
@@ -279,7 +263,7 @@ export default function Sales() {
           type: 'room',
           name: g.name_with_initials,
           amount: parseFloat(g.total_room_charge || 0),
-          date: g.first_invoice_downloaded_at || g.date_of_departure,
+          date: g.first_invoice_downloaded_at,
           label: `Room ${g.room_type} checkout`
         })),
         ...(fbConsumption || []).slice(0, 5).map(c => ({
@@ -309,30 +293,19 @@ export default function Sales() {
       const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
       const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
 
-      // ── Fetch data (by date_of_arrival \u2014 matches manual report practice) ─────
+      // ── Fetch data — room revenue by first_invoice_downloaded_at (midnight-to-midnight) ──
       const EXPORT_FIELDS = 'id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure, first_invoice_downloaded_at'
 
-      const [{ data: expInvoicedGuests }, { data: expNoInvoiceGuests }] = await Promise.all([
-        // Guests with invoice downloaded — filter by arrival date
-        supabase
-          .from('guests')
-          .select(EXPORT_FIELDS)
-          .not('first_invoice_downloaded_at', 'is', null)
-          .gte('date_of_arrival', from)
-          .lte('date_of_arrival', to)
-          .in('status', ['checked_in', 'checked_out']),
-        // Guests without invoice — also filter by arrival date
-        supabase
-          .from('guests')
-          .select(EXPORT_FIELDS)
-          .is('first_invoice_downloaded_at', null)
-          .gte('date_of_arrival', from)
-          .lte('date_of_arrival', to)
-          .in('status', ['checked_in', 'checked_out']),
-      ])
+      const { data: expGuestsRaw } = await supabase
+        .from('guests')
+        .select(EXPORT_FIELDS)
+        .not('first_invoice_downloaded_at', 'is', null)
+        .gte('first_invoice_downloaded_at', fromISO)
+        .lt('first_invoice_downloaded_at', toEndISO)
+        .in('status', ['checked_in', 'checked_out'])
 
       const expSeenIds = new Set()
-      const guestsData = [...(expInvoicedGuests || []), ...(expNoInvoiceGuests || [])].filter(g => {
+      const guestsData = (expGuestsRaw || []).filter(g => {
         if (expSeenIds.has(g.id)) return false
         expSeenIds.add(g.id)
         return true
