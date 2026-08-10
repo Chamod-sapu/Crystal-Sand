@@ -19,7 +19,8 @@ import {
   Activity,
   DollarSign,
   Waves,
-  ChevronDown
+  ChevronDown,
+  ShoppingBag
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
@@ -45,6 +46,7 @@ export default function Layout({ children }) {
         { name: 'Rooms', href: '/rooms', icon: Building2, show: true },
         { name: 'F & B', href: '/food-beverage', icon: Coffee, show: true },
         { name: 'Pool', href: '/pool', icon: Waves, show: true },
+        { name: 'Other Items', href: '/other-items', icon: ShoppingBag, show: true },
       ]
     },
     { name: 'Forecast', href: '/forecast', icon: TrendingUp, show: true },

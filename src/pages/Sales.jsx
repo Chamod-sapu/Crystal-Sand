@@ -147,7 +147,7 @@ export default function Sales() {
       // 1. Room Revenue — two-query approach for backwards compatibility:
       //    a) New records: filter by first_invoice_downloaded_at (midnight-to-midnight)
       //    b) Legacy records (NULL first_invoice_downloaded_at): filter by date_of_departure
-      const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at'
+      const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at, is_monthly_rate'
 
       const [{ data: newGuests }, { data: legacyGuests }] = await Promise.all([
         supabase
@@ -221,6 +221,13 @@ export default function Sales() {
         .gte('first_bill_downloaded_at', fromISO)
         .lt('first_bill_downloaded_at', toEndISO)
 
+      // 7. Other items sales
+      const { data: otherSales } = await supabase
+        .from('other_item_sales')
+        .select('total_price, item_name, created_at, quantity')
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
+
       // Calculate totals
       const roomRevenue = (guestsData || []).reduce((s, g) => s + (parseFloat(g.total_room_charge) || 0), 0)
       const fbRoomRevenue = (fbConsumption || []).reduce((s, c) => s + (parseFloat(c.total_price) || 0), 0)
@@ -228,7 +235,8 @@ export default function Sales() {
       const fbRevenue = fbRoomRevenue + fbRestoRevenue
       const poolRevenue = (poolVisits || []).reduce((s, p) => s + (parseFloat(p.total_charge) || 0), 0) + 
                           (poolOutside || []).reduce((s, p) => s + (parseFloat(p.total_charge) || 0), 0)
-      const otherRevenue = (purchases || []).reduce((s, p) => s + (parseFloat(p.total_price) || 0), 0) + poolRevenue
+      const otherSalesRevenue = (otherSales || []).reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
+      const otherRevenue = (purchases || []).reduce((s, p) => s + (parseFloat(p.total_price) || 0), 0) + poolRevenue + otherSalesRevenue
       const totalRevenue = roomRevenue + fbRevenue + otherRevenue
       const totalCheckouts = guestsData?.length || 0
       const totalGuests = (checkedInGuests?.length || 0) + totalCheckouts
@@ -248,6 +256,9 @@ export default function Sales() {
       ;(purchases || []).forEach(p => {
         const cat = p.category.charAt(0).toUpperCase() + p.category.slice(1)
         categoryMap[cat] = (categoryMap[cat] || 0) + parseFloat(p.total_price || 0)
+      })
+      ;(otherSales || []).forEach(o => {
+        categoryMap['Other Items'] = (categoryMap['Other Items'] || 0) + parseFloat(o.total_price || 0)
       })
       if (roomRevenue > 0) categoryMap['Room Charges'] = roomRevenue
       if (poolRevenue > 0) categoryMap['Pool Access'] = poolRevenue
@@ -284,6 +295,14 @@ export default function Sales() {
           amount: parseFloat(c.total_price || 0),
           date: c.consumed_at?.split('T')[0],
           label: c.category
+        })),
+        ...(otherSales || []).slice(0, 5).map(o => ({
+          id: o.id || Math.random(),
+          type: 'other',
+          name: o.item_name,
+          amount: parseFloat(o.total_price || 0),
+          date: o.created_at?.split('T')[0],
+          label: 'Other Items'
         }))
       ]
         .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -363,6 +382,12 @@ export default function Sales() {
         .gte('first_bill_downloaded_at', fromISO)
         .lt('first_bill_downloaded_at', toEndISO)
 
+      const { data: expOtherSales } = await supabase
+        .from('other_item_sales')
+        .select('total_price, item_name, quantity, guests(room_numbers, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure)')
+        .gte('created_at', fromISO)
+        .lt('created_at', toEndISO)
+
       // ── Colour palette ───────────────────────────────────────────────────────
       // Deep navy (header bg)
       const NAVY    = { rgb: '1E293B' }
@@ -439,7 +464,8 @@ export default function Sales() {
       const totalFB    = [...(fbData || []), ...(restoData || [])].reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
       const expPoolRev = (expPoolVisits || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0) + 
                          (expPoolOutside || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0)
-      const totalExtra = (extraData || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0) + expPoolRev
+      const expOtherSalesRev = (expOtherSales || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
+      const totalExtra = (extraData || []).reduce((s, i) => s + parseFloat(i.total_price || 0), 0) + expPoolRev + expOtherSalesRev
       const grandTotal = totalRooms + totalFB + totalExtra
 
       const fmt = '#,##0.00'
@@ -592,7 +618,7 @@ export default function Sales() {
       // ── Sheet 2: Room Revenue ───────────────────────────────────────────────
       const roomDataRows = (guestsData || []).map(g => ({
         room:     (g.room_numbers || []).join(', '),
-        desc:     `${g.name_with_initials || '—'} · Room ×${g.number_of_rooms || 1} (${g.room_type || ''})`,
+        desc:     `${g.name_with_initials || '—'} · Room ×${g.number_of_rooms || 1} (${g.room_type || ''})${g.is_monthly_rate ? ' (Monthly Rate - Daily Reports N/A)' : ''}`,
         checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
         checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
         amount:   parseFloat(g.total_room_charge || 0),
@@ -657,6 +683,16 @@ export default function Sales() {
             checkIn:  '-',
             checkOut: '-',
             amount:   parseFloat(item.total_charge || 0),
+          }
+        }),
+        ...(expOtherSales || []).map(item => {
+          const g = item.guests || {}
+          return {
+            room:     (g.room_numbers || []).join(', '),
+            desc:     `${item.item_name || '—'} (Other Items) - Qty: ${item.quantity}`,
+            checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+            checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+            amount:   parseFloat(item.total_price || 0),
           }
         }),
         ...(expPoolOutside || []).map(item => {

@@ -13,6 +13,7 @@ import SystemSettings from './pages/SystemSettings'
 import Sales from './pages/Sales'
 import UserActivity from './pages/UserActivity'
 import Pool from './pages/Pool'
+import OtherItems from './pages/OtherItems'
 import { ThemeProvider } from './context/ThemeContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { PowerOff } from 'lucide-react'
@@ -166,6 +167,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout><Pool /></Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/other-items"
+        element={
+          <ProtectedRoute>
+            <Layout><OtherItems /></Layout>
           </ProtectedRoute>
         }
       />
