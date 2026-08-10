@@ -11,7 +11,7 @@ import { fetchUSDtoLKRRate, convertUSDtoLKR, formatUSD, formatLKR, clearCachedRa
 
 export default function NewGuest() {
   const navigate = useNavigate()
-  const { userProfile } = useAuth()
+  const { userProfile, isSuperAdmin, isAdmin } = useAuth()
   const [loading, setLoading] = useState(false)
   const [allRooms, setAllRooms] = useState([])
   const [availableRooms, setAvailableRooms] = useState([])
@@ -25,6 +25,7 @@ export default function NewGuest() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [registrationType, setRegistrationType] = useState('checkin')
+  const [isLateCheckin, setIsLateCheckin] = useState(false)
   const [onlineBookingType, setOnlineBookingType] = useState('')
   const [travellingAgentName, setTravellingAgentName] = useState('')
   const [exchangeRateData, setExchangeRateData] = useState(null)
@@ -97,7 +98,9 @@ export default function NewGuest() {
     discount_type: '',
     discount_amount: 0,
     room_occupancies: {},
-    stay_type: 'night'
+    stay_type: 'night',
+    monthly_rate_months: 1,
+    monthly_rate_price: 0
   })
 
   useEffect(() => {
@@ -107,7 +110,7 @@ export default function NewGuest() {
 
   useEffect(() => {
     updateAvailableRooms()
-  }, [formData.date_of_arrival, formData.date_of_departure, formData.time_of_arrival, formData.time_of_departure, allRooms, guests])
+  }, [formData.date_of_arrival, formData.date_of_departure, formData.time_of_arrival, formData.time_of_departure, allRooms, guests, isLateCheckin])
 
   useEffect(() => {
     if (formData.mobile_number) {
@@ -390,7 +393,7 @@ export default function NewGuest() {
       const arrMinutes = arrHour * 60 + arrMin
       const depMinutes = depHour * 60 + depMin
 
-      if (depMinutes <= arrMinutes) {
+      if (depMinutes <= arrMinutes && !isLateCheckin) {
         setError('Departure time must be after arrival time for same-day bookings')
         setAvailableRooms([])
         return
@@ -567,22 +570,24 @@ export default function NewGuest() {
         ? `Mixed (${uniqueTypes.join(', ')})` 
         : uniqueTypes[0] || 'Unknown'
 
-      const totalRoomCharge = selectedRooms.reduce((total, room) => {
-        const roomNum = parseInt(room.room_number)
-        const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
-        const occupancy = formData.room_occupancies[room.room_number] || 1
-        
-        const roomCharge = calculateDynamicRoomCharges(
-          formData.date_of_arrival,
-          formData.date_of_departure,
-          roomPricing,
-          roomGroup,
-          occupancy,
-          room.base_price || 0,
-          formData.stay_type
-        )
-        return total + roomCharge
-      }, 0)
+      const totalRoomCharge = formData.stay_type === 'monthly'
+        ? parseFloat(formData.monthly_rate_price) * parseInt(formData.monthly_rate_months)
+        : selectedRooms.reduce((total, room) => {
+          const roomNum = parseInt(room.room_number)
+          const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
+          const occupancy = formData.room_occupancies[room.room_number] || 1
+          
+          const roomCharge = calculateDynamicRoomCharges(
+            formData.date_of_arrival,
+            formData.date_of_departure,
+            roomPricing,
+            roomGroup,
+            occupancy,
+            room.base_price || 0,
+            formData.stay_type
+          )
+          return total + roomCharge
+        }, 0)
 
       const guestStatus = registrationType === 'reservation' ? 'reserved' : registrationType === 'online_booking' ? 'reserved' : 'checked_in'
 
@@ -612,6 +617,9 @@ export default function NewGuest() {
           original_amount: isOnlinePlatformBooking && usdAmount ? parseFloat(usdAmount) : null,
           exchange_rate: isOnlinePlatformBooking && exchangeRateData?.rate ? exchangeRateData.rate : null,
           booking_source: registrationType === 'online_booking' ? onlineBookingType : null,
+          is_late_checkin: isLateCheckin,
+          is_monthly_rate: formData.stay_type === 'monthly',
+          monthly_rate_months: formData.stay_type === 'monthly' ? formData.monthly_rate_months : 1,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }])
@@ -620,20 +628,21 @@ export default function NewGuest() {
 
       if (guestError) throw guestError
       
-      // Log activity
-      const activityDesc = registrationType === 'checkin' 
+      const isCheckinStatus = registrationType === 'checkin' || isLateCheckin
+
+      const activityDesc = isCheckinStatus
         ? `Checked in guest ${formData.name_with_initials} (GRC: ${grcNumber}) to Room(s): ${formData.room_numbers.join(', ')}`
         : `Created ${registrationType.replace('_', ' ')} for ${formData.name_with_initials} (GRC: ${grcNumber}) for Room(s): ${formData.room_numbers.join(', ')}`
       
       await logActivity(
         userProfile, 
-        registrationType === 'checkin' ? 'create' : 'create', 
+        'create', 
         'booking', 
         activityDesc, 
         guest.id
       )
 
-      if (registrationType === 'checkin') {
+      if (isCheckinStatus) {
         for (const roomNumber of formData.room_numbers) {
           const { error: roomError } = await supabase
             .from('rooms')
@@ -700,22 +709,24 @@ export default function NewGuest() {
     }
 
     const selectedRooms = allRooms.filter(r => formData.room_numbers.includes(r.room_number))
-    const originalRate = selectedRooms.reduce((total, room) => {
-      const roomNum = parseInt(room.room_number)
-      const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
-      const occupancy = formData.room_occupancies[room.room_number] || 1
-      
-      const roomCharge = calculateDynamicRoomCharges(
-        formData.date_of_arrival,
-        formData.date_of_departure,
-        roomPricing,
-        roomGroup,
-        occupancy,
-        room.base_price || 0,
-        formData.stay_type
-      )
-      return total + roomCharge
-    }, 0)
+    const originalRate = formData.stay_type === 'monthly'
+      ? parseFloat(formData.monthly_rate_price) * parseInt(formData.monthly_rate_months)
+      : selectedRooms.reduce((total, room) => {
+        const roomNum = parseInt(room.room_number)
+        const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
+        const occupancy = formData.room_occupancies[room.room_number] || 1
+        
+        const roomCharge = calculateDynamicRoomCharges(
+          formData.date_of_arrival,
+          formData.date_of_departure,
+          roomPricing,
+          roomGroup,
+          occupancy,
+          room.base_price || 0,
+          formData.stay_type
+        )
+        return total + roomCharge
+      }, 0)
 
     let discountAmount = 0
     let finalRate = originalRate
@@ -1151,8 +1162,57 @@ export default function NewGuest() {
                     >
                       NIGHT STAY
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, stay_type: 'monthly' }))}
+                      className={`px-3 py-1 rounded text-xs font-bold transition-all ${
+                        formData.stay_type === 'monthly'
+                          ? 'bg-primary-600 text-white shadow-lg'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      MONTHLY RATE
+                    </button>
                   </div>
                 </div>
+
+                {formData.stay_type === 'monthly' && (
+                  <div className="mb-4 p-4 bg-primary-50 dark:bg-primary-900/10 rounded-lg border border-primary-200 dark:border-primary-800">
+                    <h3 className="text-sm font-bold text-primary-700 dark:text-primary-400 mb-3">Monthly Stay Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="label text-xs">Number of Months</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.monthly_rate_months}
+                          onChange={(e) => setFormData(prev => ({ ...prev, monthly_rate_months: parseInt(e.target.value) || 1 }))}
+                          className="input-field bg-white dark:bg-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="label text-xs">Monthly Rate (LKR)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.monthly_rate_price}
+                          onChange={(e) => setFormData(prev => ({ ...prev, monthly_rate_price: parseFloat(e.target.value) || 0 }))}
+                          className="input-field bg-white dark:bg-slate-900"
+                          disabled={!(isSuperAdmin() || isAdmin())}
+                          placeholder={!(isSuperAdmin() || isAdmin()) ? "Admin access required" : "Enter price"}
+                        />
+                        {!(isSuperAdmin() || isAdmin()) && (
+                          <p className="text-xs text-amber-500 mt-1">Only Admin can set the monthly rate.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-center space-x-2 text-amber-600 dark:text-amber-400 text-xs font-medium">
+                      <AlertCircle size={16} className="shrink-0" />
+                      <span>Daily reports and daily rate breakdowns are <strong>Not Applicable</strong> for Monthly rates.</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {availableRooms.map(room => (
                     <button
@@ -1174,15 +1234,18 @@ export default function NewGuest() {
                       <div className="text-xs opacity-75 mt-1">
                         {formData.room_numbers.includes(room.room_number) ? (
                           <span className="font-bold text-primary-500">
-                            LKR {calculateDynamicRoomCharges(
-                              formData.date_of_arrival,
-                              formData.date_of_departure,
-                              roomPricing,
-                              [1,2,3,5,6,7].includes(parseInt(room.room_number)) ? 'A' : 'B',
-                              formData.room_occupancies[room.room_number] || 1,
-                              room.base_price || 0,
-                              formData.stay_type
-                            ).toLocaleString()}
+                            LKR {formData.stay_type === 'monthly'
+                              ? parseFloat(formData.monthly_rate_price).toLocaleString()
+                              : calculateDynamicRoomCharges(
+                                  formData.date_of_arrival,
+                                  formData.date_of_departure,
+                                  roomPricing,
+                                  [1,2,3,5,6,7].includes(parseInt(room.room_number)) ? 'A' : 'B',
+                                  formData.room_occupancies[room.room_number] || 1,
+                                  room.base_price || 0,
+                                  formData.stay_type
+                                ).toLocaleString()
+                            }
                           </span>
                         ) : (
                           <>LKR {room.base_price?.toLocaleString() || '0'}</>
@@ -1304,10 +1367,30 @@ export default function NewGuest() {
         </div>
 
         <div className="card p-6">
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center space-x-2">
-            <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm">4</span>
-            <span>Check-in & Check-out</span>
-          </h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center space-x-2">
+              <span className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center text-sm text-white">4</span>
+              <span>Check-in & Check-out</span>
+            </h2>
+            <div className="flex items-center space-x-3 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700">
+              <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Late Check-in</span>
+              <button
+                type="button"
+                onClick={() => setIsLateCheckin(!isLateCheckin)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isLateCheckin ? 'bg-primary-600' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+                title="Toggle Late Check-in mode to select past dates"
+                disabled={loading}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isLateCheckin ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="label">Date of Arrival <span className="text-red-500">*</span></label>
@@ -1317,7 +1400,7 @@ export default function NewGuest() {
                 value={formData.date_of_arrival}
                 onChange={handleDateChange}
                 className="input-field"
-                min={format(new Date(), 'yyyy-MM-dd')}
+                min={isLateCheckin ? undefined : format(new Date(), 'yyyy-MM-dd')}
                 required
                 disabled={loading}
               />

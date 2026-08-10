@@ -218,6 +218,7 @@ export function AuthProvider({ children }) {
   const canManageSystem = () => isSuperAdmin()
   const canManageRooms = () => isSuperAdmin() || isAdmin()
   const canManageFBItems = () => isSuperAdmin() || isAdmin()
+  const canManageOtherItems = () => isSuperAdmin() || isAdmin()
 
   const value = {
     user,
@@ -233,6 +234,7 @@ export function AuthProvider({ children }) {
     canManageSystem,
     canManageRooms,
     canManageFBItems,
+    canManageOtherItems,
     refreshSystemSettings,
     refreshUserProfile
   }
