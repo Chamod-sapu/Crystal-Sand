@@ -598,11 +598,13 @@ export default function NewGuest() {
         numberOfNights = 1
       }
 
+      const { monthly_rate_price, ...dbFormData } = formData
+
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
-          ...formData,
+          ...dbFormData,
           room_type: typeSummary,
           advance_payment_method: formData.advance_payment_method || null,
           discount_type: formData.discount_type || null,
