@@ -621,8 +621,7 @@ export default function NewGuest() {
           is_monthly_rate: formData.stay_type === 'monthly',
           monthly_rate_months: formData.stay_type === 'monthly' ? formData.monthly_rate_months : 1,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          first_invoice_downloaded_at: new Date().toISOString()
+          updated_at: new Date().toISOString()
         }])
         .select()
         .single()

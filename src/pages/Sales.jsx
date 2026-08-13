@@ -144,16 +144,48 @@ export default function Sales() {
     const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo, singleDate)
 
     try {
-      // 1. Room Revenue — filter strictly by first_invoice_downloaded_at
-      const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at, is_monthly_rate'
+      // 1. Room Revenue — split into Advance Payments and Balance Payments
+      const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, advance_payment_amount, advance_payment_date, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at, is_monthly_rate'
 
-      const { data: guestsData } = await supabase
+      // a) Advance payments made in this period
+      const { data: advanceGuests } = await supabase
         .from('guests')
         .select(GUEST_FIELDS)
-        .not('first_invoice_downloaded_at', 'is', null)
-        .gte('first_invoice_downloaded_at', fromISO)
-        .lt('first_invoice_downloaded_at', toEndISO)
-        .in('status', ['checked_in', 'checked_out'])
+        .gt('advance_payment_amount', 0)
+        .gte('advance_payment_date', from)
+        .lte('advance_payment_date', to)
+
+      // b) Balance payments settled in this period (fallback to departure if no invoice)
+      const [{ data: balanceNew }, { data: balanceLegacy }] = await Promise.all([
+        supabase
+          .from('guests')
+          .select(GUEST_FIELDS)
+          .not('first_invoice_downloaded_at', 'is', null)
+          .gte('first_invoice_downloaded_at', fromISO)
+          .lt('first_invoice_downloaded_at', toEndISO)
+          .in('status', ['checked_in', 'checked_out']),
+        supabase
+          .from('guests')
+          .select(GUEST_FIELDS)
+          .is('first_invoice_downloaded_at', null)
+          .gte('date_of_departure', from)
+          .lte('date_of_departure', to)
+          .in('status', ['checked_in', 'checked_out']),
+      ])
+
+      const balanceGuests = [...(balanceNew || []), ...(balanceLegacy || [])]
+
+      // Combine for checkouts list (unique guests)
+      const seenIds = new Set()
+      const guestsData = [...(advanceGuests || []), ...balanceGuests].filter(g => {
+        if (seenIds.has(g.id)) return false
+        seenIds.add(g.id)
+        return true
+      }).sort((a, b) => {
+        const aDate = a.first_invoice_downloaded_at || a.date_of_departure || a.created_at
+        const bDate = b.first_invoice_downloaded_at || b.date_of_departure || b.created_at
+        return new Date(bDate) - new Date(aDate)
+      })
 
       // Also get checked-in guests for count
       const { data: checkedInGuests } = await supabase
@@ -203,10 +235,40 @@ export default function Sales() {
         .from('other_item_sales')
         .select('total_price, item_name, created_at, quantity')
         .gte('created_at', fromISO)
-        .lt('created_at', toEndISO)
+      .lt('created_at', toEndISO)
 
       // Calculate totals
-      const roomRevenue = (guestsData || []).reduce((s, g) => s + (parseFloat(g.total_room_charge) || 0), 0)
+      let roomRevenue = 0
+      let totalRoomRevenue = 0
+      const allRows = []
+      
+      guestsData.forEach(g => {
+        let revenueForPeriod = 0
+        const advance = parseFloat(g.advance_payment_amount) || 0
+        const total = parseFloat(g.total_room_charge) || 0
+        const balance = Math.max(0, total - advance)
+
+        const isAdvanceInPeriod = g.advance_payment_date >= from && g.advance_payment_date <= to
+        const invDate = g.first_invoice_downloaded_at ? new Date(g.first_invoice_downloaded_at) : new Date(g.date_of_departure)
+        const isBalanceInPeriod = invDate >= new Date(fromISO) && invDate < new Date(toEndISO)
+
+        if (isAdvanceInPeriod) revenueForPeriod += advance
+        if (isBalanceInPeriod) revenueForPeriod += balance
+
+        if (revenueForPeriod > 0) {
+          totalRoomRevenue += revenueForPeriod
+          allRows.push([
+            g.name_with_initials,
+            `Room Charges (${isAdvanceInPeriod && isBalanceInPeriod ? 'Full Payment' : isAdvanceInPeriod ? 'Advance Payment' : 'Balance Payment'})`,
+            g.room_type,
+            revenueForPeriod,
+            format(new Date(g.date_of_arrival), 'dd MMM'),
+            format(new Date(g.date_of_departure), 'dd MMM')
+          ])
+        }
+      })
+      roomRevenue = totalRoomRevenue
+
       const fbRoomRevenue = (fbConsumption || []).reduce((s, c) => s + (parseFloat(c.total_price) || 0), 0)
       const fbRestoRevenue = (restaurantOrders || []).reduce((s, o) => s + (parseFloat(o.total_price) || 0), 0)
       const fbRevenue = fbRoomRevenue + fbRestoRevenue
@@ -257,18 +319,27 @@ export default function Sales() {
 
       // Recent transactions — combine checkouts and F&B
       const transactions = [
-        ...(guestsData || []).slice(0, 5).map(g => ({
-          id: g.id,
-          type: 'room',
-          name: g.name_with_initials,
-          amount: parseFloat(g.total_room_charge || 0),
-          date: g.first_invoice_downloaded_at || g.date_of_departure,
-          label: `Room ${g.room_type} checkout`
+        ...balanceGuests.map(g => {
+          const total = parseFloat(g.total_room_charge) || 0
+          const advance = parseFloat(g.advance_payment_amount) || 0
+          return {
+            id: g.id + '-balance',
+            description: g.name_with_initials,
+            type: `Room ${g.room_type} balance`,
+            date: g.first_invoice_downloaded_at || g.date_of_departure,
+            amount: Math.max(0, total - advance)
+          }
+        }),
+        ...(advanceGuests || []).map(g => ({
+          id: g.id + '-advance',
+          description: g.name_with_initials,
+          type: `Room ${g.room_type} advance`,
+          date: g.advance_payment_date,
+          amount: parseFloat(g.advance_payment_amount) || 0
         })),
         ...(fbConsumption || []).slice(0, 5).map(c => ({
           id: c.id || Math.random(),
           type: 'fb',
-          name: c.item_name,
           amount: parseFloat(c.total_price || 0),
           date: c.consumed_at?.split('T')[0],
           label: c.category
@@ -300,16 +371,41 @@ export default function Sales() {
       const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
       const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
 
-      // ── Fetch data (strictly by first_invoice_downloaded_at) ─────────────
-      const EXPORT_FIELDS = 'id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure, first_invoice_downloaded_at'
+      // ── Fetch data (Advance + Balance Payments) ─────────────
+      const EXPORT_FIELDS = 'id, name_with_initials, room_numbers, total_room_charge, advance_payment_amount, advance_payment_date, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure, first_invoice_downloaded_at'
 
-      const { data: guestsData } = await supabase
+      const { data: expAdvanceGuests } = await supabase
         .from('guests')
         .select(EXPORT_FIELDS)
-        .not('first_invoice_downloaded_at', 'is', null)
-        .gte('first_invoice_downloaded_at', fromISO)
-        .lt('first_invoice_downloaded_at', toEndISO)
-        .in('status', ['checked_in', 'checked_out'])
+        .gt('advance_payment_amount', 0)
+        .gte('advance_payment_date', from)
+        .lte('advance_payment_date', to)
+
+      const [{ data: expBalanceNew }, { data: expBalanceLegacy }] = await Promise.all([
+        supabase
+          .from('guests')
+          .select(EXPORT_FIELDS)
+          .not('first_invoice_downloaded_at', 'is', null)
+          .gte('first_invoice_downloaded_at', fromISO)
+          .lt('first_invoice_downloaded_at', toEndISO)
+          .in('status', ['checked_in', 'checked_out']),
+        supabase
+          .from('guests')
+          .select(EXPORT_FIELDS)
+          .is('first_invoice_downloaded_at', null)
+          .gte('date_of_departure', from)
+          .lte('date_of_departure', to)
+          .in('status', ['checked_in', 'checked_out']),
+      ])
+
+      const expBalanceGuests = [...(expBalanceNew || []), ...(expBalanceLegacy || [])]
+
+      const expSeenIds = new Set()
+      const guestsData = [...(expAdvanceGuests || []), ...expBalanceGuests].filter(g => {
+        if (expSeenIds.has(g.id)) return false
+        expSeenIds.add(g.id)
+        return true
+      })
 
 
       const { data: fbData } = await supabase
@@ -421,7 +517,15 @@ export default function Sales() {
       // ═══════════════════════════════════════════════════════════════════════
       // SHEET 1 — COVER / SUMMARY
       // ═══════════════════════════════════════════════════════════════════════
-      const totalRooms = (guestsData || []).reduce((s, g) => s + parseFloat(g.total_room_charge || 0), 0)
+      let totalRooms = 0
+      guestsData.forEach(g => {
+        const isAdvanceInPeriod = g.advance_payment_date >= from && g.advance_payment_date <= to
+        const invDate = g.first_invoice_downloaded_at ? new Date(g.first_invoice_downloaded_at) : new Date(g.date_of_departure)
+        const isBalanceInPeriod = invDate >= new Date(fromISO) && invDate < new Date(toEndISO)
+
+        if (isAdvanceInPeriod) totalRooms += parseFloat(g.advance_payment_amount) || 0
+        if (isBalanceInPeriod) totalRooms += Math.max(0, (parseFloat(g.total_room_charge) || 0) - (parseFloat(g.advance_payment_amount) || 0))
+      })
       const totalFB    = [...(fbData || []), ...(restoData || [])].reduce((s, i) => s + parseFloat(i.total_price || 0), 0)
       const expPoolRev = (expPoolVisits || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0) + 
                          (expPoolOutside || []).reduce((s, p) => s + parseFloat(p.total_charge || 0), 0)
@@ -577,13 +681,38 @@ export default function Sales() {
       }
 
       // ── Sheet 2: Room Revenue ───────────────────────────────────────────────
-      const roomDataRows = (guestsData || []).map(g => ({
-        room:     (g.room_numbers || []).join(', '),
-        desc:     `${g.name_with_initials || '—'} · Room ×${g.number_of_rooms || 1} (${g.room_type || ''})${g.is_monthly_rate ? ' (Monthly Rate - Daily Reports N/A)' : ''}`,
-        checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
-        checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
-        amount:   parseFloat(g.total_room_charge || 0),
-      }))
+      const roomDataRows = []
+      guestsData.forEach(g => {
+        const advance = parseFloat(g.advance_payment_amount) || 0
+        const total = parseFloat(g.total_room_charge) || 0
+        const balance = Math.max(0, total - advance)
+
+        const isAdvanceInPeriod = g.advance_payment_date >= from && g.advance_payment_date <= to
+        const invDate = g.first_invoice_downloaded_at ? new Date(g.first_invoice_downloaded_at) : new Date(g.date_of_departure)
+        const isBalanceInPeriod = invDate >= new Date(fromISO) && invDate < new Date(toEndISO)
+
+        const baseDesc = `${g.name_with_initials || '—'} · Room ×${g.number_of_rooms || 1} (${g.room_type || ''})${g.is_monthly_rate ? ' (Monthly Rate - Daily Reports N/A)' : ''}`
+
+        if (isAdvanceInPeriod && advance > 0) {
+          roomDataRows.push({
+            room:     (g.room_numbers || []).join(', '),
+            desc:     `${baseDesc} [Advance Payment]`,
+            checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+            checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+            amount:   advance,
+          })
+        }
+
+        if (isBalanceInPeriod && balance > 0) {
+          roomDataRows.push({
+            room:     (g.room_numbers || []).join(', '),
+            desc:     `${baseDesc} [Balance Payment]`,
+            checkIn:  `${g.date_of_arrival || ''}  ${g.time_of_arrival || ''}`.trim(),
+            checkOut: `${g.date_of_departure || ''}  ${g.time_of_departure || ''}`.trim(),
+            amount:   balance,
+          })
+        }
+      })
 
       const wsRooms = buildDataSheet({
         title:       'Daily Revenue Summary — Rooms',
