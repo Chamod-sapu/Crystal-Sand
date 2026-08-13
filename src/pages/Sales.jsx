@@ -144,39 +144,16 @@ export default function Sales() {
     const { from, to, fromISO, toEndISO } = getPeriodDates(period, customFrom, customTo, singleDate)
 
     try {
-      // 1. Room Revenue — two-query approach for backwards compatibility:
-      //    a) New records: filter by first_invoice_downloaded_at (midnight-to-midnight)
-      //    b) Legacy records (NULL first_invoice_downloaded_at): filter by date_of_departure
+      // 1. Room Revenue — filter strictly by first_invoice_downloaded_at
       const GUEST_FIELDS = 'id, name_with_initials, total_room_charge, date_of_arrival, date_of_departure, number_of_rooms, room_type, created_at, first_invoice_downloaded_at, is_monthly_rate'
 
-      const [{ data: newGuests }, { data: legacyGuests }] = await Promise.all([
-        supabase
-          .from('guests')
-          .select(GUEST_FIELDS)
-          .not('first_invoice_downloaded_at', 'is', null)
-          .gte('first_invoice_downloaded_at', fromISO)
-          .lt('first_invoice_downloaded_at', toEndISO)
-          .in('status', ['checked_in', 'checked_out']),
-        supabase
-          .from('guests')
-          .select(GUEST_FIELDS)
-          .is('first_invoice_downloaded_at', null)
-          .gte('date_of_departure', from)
-          .lte('date_of_departure', to)
-          .in('status', ['checked_in', 'checked_out']),
-      ])
-
-      // Merge & deduplicate by id
-      const seenIds = new Set()
-      const guestsData = [...(newGuests || []), ...(legacyGuests || [])].filter(g => {
-        if (seenIds.has(g.id)) return false
-        seenIds.add(g.id)
-        return true
-      }).sort((a, b) => {
-        const aDate = a.first_invoice_downloaded_at || a.date_of_departure
-        const bDate = b.first_invoice_downloaded_at || b.date_of_departure
-        return new Date(bDate) - new Date(aDate)
-      })
+      const { data: guestsData } = await supabase
+        .from('guests')
+        .select(GUEST_FIELDS)
+        .not('first_invoice_downloaded_at', 'is', null)
+        .gte('first_invoice_downloaded_at', fromISO)
+        .lt('first_invoice_downloaded_at', toEndISO)
+        .in('status', ['checked_in', 'checked_out'])
 
       // Also get checked-in guests for count
       const { data: checkedInGuests } = await supabase
@@ -323,32 +300,16 @@ export default function Sales() {
       const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period
       const exportedAt = format(new Date(), 'dd MMM yyyy, HH:mm')
 
-      // ── Fetch data (midnight-to-midnight, with legacy fallback) ─────────────
+      // ── Fetch data (strictly by first_invoice_downloaded_at) ─────────────
       const EXPORT_FIELDS = 'id, name_with_initials, room_numbers, total_room_charge, room_type, number_of_rooms, date_of_arrival, date_of_departure, time_of_arrival, time_of_departure, first_invoice_downloaded_at'
 
-      const [{ data: expNewGuests }, { data: expLegacyGuests }] = await Promise.all([
-        supabase
-          .from('guests')
-          .select(EXPORT_FIELDS)
-          .not('first_invoice_downloaded_at', 'is', null)
-          .gte('first_invoice_downloaded_at', fromISO)
-          .lt('first_invoice_downloaded_at', toEndISO)
-          .in('status', ['checked_in', 'checked_out']),
-        supabase
-          .from('guests')
-          .select(EXPORT_FIELDS)
-          .is('first_invoice_downloaded_at', null)
-          .gte('date_of_departure', from)
-          .lte('date_of_departure', to)
-          .in('status', ['checked_in', 'checked_out']),
-      ])
-
-      const expSeenIds = new Set()
-      const guestsData = [...(expNewGuests || []), ...(expLegacyGuests || [])].filter(g => {
-        if (expSeenIds.has(g.id)) return false
-        expSeenIds.add(g.id)
-        return true
-      })
+      const { data: guestsData } = await supabase
+        .from('guests')
+        .select(EXPORT_FIELDS)
+        .not('first_invoice_downloaded_at', 'is', null)
+        .gte('first_invoice_downloaded_at', fromISO)
+        .lt('first_invoice_downloaded_at', toEndISO)
+        .in('status', ['checked_in', 'checked_out'])
 
 
       const { data: fbData } = await supabase
