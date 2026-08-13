@@ -262,8 +262,9 @@ export default function Sales() {
           totalRoomRevenue += advance
           roomTxns.push({
             id: g.id + '-advance',
-            description: g.name_with_initials,
-            type: `Room ${g.room_type} advance`,
+            name: g.name_with_initials || 'Guest',
+            label: `Room (${g.room_type || 'Stay'}) Advance`,
+            category: 'room',
             date: g.advance_payment_date,
             amount: advance
           })
@@ -273,8 +274,9 @@ export default function Sales() {
           totalRoomRevenue += balance
           roomTxns.push({
             id: g.id + '-balance',
-            description: g.name_with_initials,
-            type: advance > 0 ? `Room ${g.room_type} balance` : `Room ${g.room_type} full payment`,
+            name: g.name_with_initials || 'Guest',
+            label: advance > 0 ? `Room (${g.room_type || 'Stay'}) Balance` : `Room (${g.room_type || 'Stay'}) Full Payment`,
+            category: 'room',
             date: g.first_invoice_downloaded_at ? format(new Date(g.first_invoice_downloaded_at), 'yyyy-MM-dd') : g.date_of_departure,
             amount: balance
           })
@@ -335,16 +337,16 @@ export default function Sales() {
         ...roomTxns,
         ...(fbConsumption || []).slice(0, 5).map(c => ({
           id: c.id || Math.random(),
-          type: 'fb',
-          name: c.item_name,
+          category: 'fb',
+          name: c.item_name || 'F&B Item',
           amount: parseFloat(c.total_price || 0),
           date: c.consumed_at?.split('T')[0],
-          label: c.category
+          label: c.category || 'F&B'
         })),
         ...(otherSales || []).slice(0, 5).map(o => ({
           id: o.id || Math.random(),
-          type: 'other',
-          name: o.item_name,
+          category: 'other',
+          name: o.item_name || 'Other Item',
           amount: parseFloat(o.total_price || 0),
           date: o.created_at?.split('T')[0],
           label: 'Other Items'
@@ -1063,14 +1065,16 @@ export default function Sales() {
                   <tbody>
                     {recentTransactions.map((txn, i) => (
                       <tr key={i} className="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3 px-6 text-slate-900 dark:text-white font-medium">{txn.name}</td>
+                        <td className="py-3 px-6 text-slate-900 dark:text-white font-medium">{txn.name || '—'}</td>
                         <td className="py-3 px-6">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                            txn.type === 'room'
-                              ? 'bg-cyan-500/20 text-cyan-400'
-                              : 'bg-amber-500/20 text-amber-400'
+                            txn.category === 'room'
+                              ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                              : txn.category === 'fb'
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           }`}>
-                            {txn.label}
+                            {txn.label || 'Transaction'}
                           </span>
                         </td>
                         <td className="py-3 px-6 text-slate-500 dark:text-gray-400 text-sm">
