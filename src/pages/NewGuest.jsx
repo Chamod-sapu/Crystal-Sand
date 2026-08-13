@@ -598,13 +598,11 @@ export default function NewGuest() {
         numberOfNights = 1
       }
 
-      const { monthly_rate_price, ...dbFormData } = formData
-
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
-          ...dbFormData,
+          ...formData,
           room_type: typeSummary,
           advance_payment_method: formData.advance_payment_method || null,
           discount_type: formData.discount_type || null,
@@ -623,7 +621,8 @@ export default function NewGuest() {
           is_monthly_rate: formData.stay_type === 'monthly',
           monthly_rate_months: formData.stay_type === 'monthly' ? formData.monthly_rate_months : 1,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          first_invoice_downloaded_at: new Date().toISOString()
         }])
         .select()
         .single()

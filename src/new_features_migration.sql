@@ -2,6 +2,7 @@
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS is_late_checkin boolean DEFAULT false;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS is_monthly_rate boolean DEFAULT false;
 ALTER TABLE guests ADD COLUMN IF NOT EXISTS monthly_rate_months integer DEFAULT 1;
+ALTER TABLE guests ADD COLUMN IF NOT EXISTS monthly_rate_price numeric DEFAULT 0;
 
 -- 2. Create other_items table for catalog management
 CREATE TABLE IF NOT EXISTS other_items (
@@ -47,3 +48,8 @@ ON other_item_sales FOR SELECT TO authenticated USING (true);
 DROP POLICY IF EXISTS "Allow all actions for authenticated users on other_item_sales" ON other_item_sales;
 CREATE POLICY "Allow all actions for authenticated users on other_item_sales"
 ON other_item_sales FOR ALL TO authenticated USING (true);
+
+-- 4. Backfill first_invoice_downloaded_at for existing guests to recognize revenue at creation
+UPDATE guests 
+SET first_invoice_downloaded_at = created_at 
+WHERE first_invoice_downloaded_at IS NULL;
