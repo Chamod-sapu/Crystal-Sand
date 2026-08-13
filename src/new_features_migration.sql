@@ -49,7 +49,7 @@ DROP POLICY IF EXISTS "Allow all actions for authenticated users on other_item_s
 CREATE POLICY "Allow all actions for authenticated users on other_item_sales"
 ON other_item_sales FOR ALL TO authenticated USING (true);
 
--- 4. Backfill first_invoice_downloaded_at for existing guests to recognize revenue at creation
+-- 4. Revert earlier backfill: Ensure first_invoice_downloaded_at is NULL for checked_in guests
 UPDATE guests 
-SET first_invoice_downloaded_at = created_at 
-WHERE first_invoice_downloaded_at IS NULL;
+SET first_invoice_downloaded_at = NULL 
+WHERE status = 'checked_in' AND first_invoice_downloaded_at IS NOT NULL;
