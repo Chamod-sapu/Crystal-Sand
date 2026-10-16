@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { logActivity } from '../lib/activityLogger'
 import { useAuth } from '../context/AuthContext'
-import { formatCurrency, calculateBillTotal, calculateDynamicRoomCharges } from '../utils/calculations'
+import { formatCurrency, calculateBillTotal, calculateDynamicRoomCharges, calculateDiscountInfo } from '../utils/calculations'
 import { Plus, Edit2, Trash2, X, Save, AlertCircle, User, Calendar, Phone, CreditCard, Search, Printer, Receipt, CalendarPlus, LogIn, Tag, DollarSign } from 'lucide-react'
 import { format, addDays, differenceInDays } from 'date-fns'
 import { formatUSD } from '../utils/currencyConverter'
@@ -266,10 +266,16 @@ export default function Rooms() {
       return total + roomCharge
     }, 0)
 
-    const additionalCharge = newTotalRoomCharge - parseFloat(selectedGuestPopup.total_room_charge)
     const effectiveNights = selectedGuestPopup.number_of_nights || (selectedGuestPopup.date_of_arrival === selectedGuestPopup.date_of_departure ? 1 : 0)
     const additionalNights = newNights - effectiveNights
-    const pricePerNight = additionalNights > 0 ? additionalCharge / (additionalNights * selectedGuestPopup.room_numbers.length) : 0
+    const numberOfRooms = selectedGuestPopup.room_numbers.length
+
+    // If guest has custom discounted room charge, preserve the effective nightly rate
+    const pricePerNight = effectiveNights > 0 && selectedGuestPopup.total_room_charge 
+      ? parseFloat(selectedGuestPopup.total_room_charge) / (effectiveNights * numberOfRooms) 
+      : (additionalNights > 0 ? (newTotalRoomCharge - parseFloat(selectedGuestPopup.total_room_charge)) / (additionalNights * numberOfRooms) : 0)
+    const additionalCharge = pricePerNight * additionalNights * numberOfRooms
+    const calculatedNewTotal = parseFloat(selectedGuestPopup.total_room_charge) + additionalCharge
 
     setExtendPreview({
       currentDeparture: format(currentDeparture, 'MMM dd, yyyy'),
@@ -280,7 +286,7 @@ export default function Rooms() {
       pricePerNight,
       additionalCharge,
       currentRoomCharge: parseFloat(selectedGuestPopup.total_room_charge),
-      newTotalRoomCharge
+      newTotalRoomCharge: calculatedNewTotal
     })
   }
 
@@ -714,14 +720,34 @@ export default function Rooms() {
     })
 
     // Bill Details Table
-    const roomCharge = guestToPrint.total_room_charge || 0
-    const advancePaid = guestToPrint.advance_payment_amount || 0
+    const roomCharge = parseFloat(guestToPrint.total_room_charge) || 0
+    const advancePaid = parseFloat(guestToPrint.advance_payment_amount) || 0
     const totalDue = Math.max(0, roomCharge - advancePaid)
 
-    const tableBody = [
-      ['Total Room Charge', formatCurrency(roomCharge)],
-      ['Advance Payment', { content: formatCurrency(advancePaid), styles: { textColor: [0, 150, 0] } }]
-    ]
+    const discountInfo = (guestToPrint.discount_type && guestToPrint.discount_amount)
+      ? calculateDiscountInfo(guestToPrint.discount_type, guestToPrint.discount_amount, roomCharge)
+      : null
+
+    const tableBody = []
+
+    if (discountInfo) {
+      tableBody.push(['Standard Room Charge', formatCurrency(discountInfo.originalRoomCharge)])
+      tableBody.push([
+        `Discount (${discountInfo.discountType === 'percentage' 
+          ? `${discountInfo.discountValue}%` 
+          : discountInfo.discountType === 'discounted_rate'
+          ? `Agreed Rate`
+          : discountInfo.discountType === 'nightly_rate'
+          ? `Nightly Rate`
+          : 'Fixed'})`,
+        { content: `-${formatCurrency(discountInfo.discountAmount)}`, styles: { textColor: [200, 0, 0] } }
+      ])
+      tableBody.push(['Total Room Charge (After Discount)', formatCurrency(roomCharge)])
+    } else {
+      tableBody.push(['Total Room Charge', formatCurrency(roomCharge)])
+    }
+
+    tableBody.push(['Advance Payment', { content: formatCurrency(advancePaid), styles: { textColor: [0, 150, 0] } }])
 
     if (guestToPrint.original_currency === 'USD' && guestToPrint.original_amount) {
       tableBody.push([
@@ -1504,10 +1530,33 @@ export default function Rooms() {
                         </span>
                       </div>
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-slate-500 dark:text-gray-400">Total Room Charge</span>
-                          <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
-                        </div>
+                        {(() => {
+                          const popupDiscount = (selectedGuestPopup.discount_type && selectedGuestPopup.discount_amount)
+                            ? calculateDiscountInfo(selectedGuestPopup.discount_type, selectedGuestPopup.discount_amount, selectedGuestPopup.total_room_charge)
+                            : null
+
+                          return popupDiscount ? (
+                            <>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500 dark:text-gray-400">Standard Room Rate</span>
+                                <span className="text-slate-900 dark:text-white font-medium line-through">{formatCurrency(popupDiscount.originalRoomCharge)}</span>
+                              </div>
+                              <div className="flex justify-between text-yellow-400">
+                                <span>Discount ({popupDiscount.discountType === 'percentage' ? `${popupDiscount.discountValue}%` : popupDiscount.discountType === 'discounted_rate' ? 'Agreed Rate' : 'Fixed'})</span>
+                                <span className="font-medium">-{formatCurrency(popupDiscount.discountAmount)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500 dark:text-gray-400">Discounted Room Rate</span>
+                                <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 dark:text-gray-400">Total Room Charge</span>
+                              <span className="text-slate-900 dark:text-white font-medium">{formatCurrency(selectedGuestPopup.total_room_charge || 0)}</span>
+                            </div>
+                          )
+                        })()}
                         {selectedGuestPopup.advance_payment_amount > 0 && (
                           <div className="space-y-1">
                             <div className="flex justify-between">

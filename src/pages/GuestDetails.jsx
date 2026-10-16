@@ -479,10 +479,15 @@ export default function GuestDetails() {
 
     if (discountInfo) {
       tableData.push(['Room Charges (Original)', '', '', formatCurrency(discountInfo.originalRoomCharge)])
+      const discountLabel = discountInfo.discountType === 'percentage'
+        ? `${discountInfo.discountValue}%`
+        : discountInfo.discountType === 'discounted_rate'
+        ? `Agreed Rate: ${formatCurrency(discountInfo.discountedRoomCharge)}`
+        : discountInfo.discountType === 'nightly_rate'
+        ? `Nightly Rate`
+        : 'Fixed'
       tableData.push([
-        `Discount (${discountInfo.discountType === 'percentage' 
-          ? `${discountInfo.discountValue}%` 
-          : 'Fixed'})`,
+        `Discount (${discountLabel})`,
         '',
         '',
         `-${formatCurrency(discountInfo.discountAmount)}`
@@ -926,6 +931,10 @@ export default function GuestDetails() {
                         <span className="text-slate-900 dark:text-white font-medium capitalize">
                           {discountInfo.discountType === 'percentage' 
                             ? `${discountInfo.discountValue}% Off` 
+                            : discountInfo.discountType === 'discounted_rate'
+                            ? `Agreed Room Rate (${formatCurrency(discountInfo.discountedRoomCharge)})`
+                            : discountInfo.discountType === 'nightly_rate'
+                            ? `Discounted Nightly Rate`
                             : `Fixed Amount`}
                         </span>
                       </div>
@@ -1139,6 +1148,10 @@ export default function GuestDetails() {
                         <span>
                           Discount ({discountInfo.discountType === 'percentage' 
                             ? `${discountInfo.discountValue}%` 
+                            : discountInfo.discountType === 'discounted_rate'
+                            ? `Agreed Rate`
+                            : discountInfo.discountType === 'nightly_rate'
+                            ? `Nightly Rate`
                             : 'Fixed'})
                         </span>
                       </span>
