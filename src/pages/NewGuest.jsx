@@ -570,24 +570,9 @@ export default function NewGuest() {
         ? `Mixed (${uniqueTypes.join(', ')})` 
         : uniqueTypes[0] || 'Unknown'
 
-      const totalRoomCharge = formData.stay_type === 'monthly'
-        ? parseFloat(formData.monthly_rate_price) * parseInt(formData.monthly_rate_months)
-        : selectedRooms.reduce((total, room) => {
-          const roomNum = parseInt(room.room_number)
-          const roomGroup = [1,2,3,5,6,7].includes(roomNum) ? 'A' : 'B'
-          const occupancy = formData.room_occupancies[room.room_number] || 1
-          
-          const roomCharge = calculateDynamicRoomCharges(
-            formData.date_of_arrival,
-            formData.date_of_departure,
-            roomPricing,
-            roomGroup,
-            occupancy,
-            room.base_price || 0,
-            formData.stay_type
-          )
-          return total + roomCharge
-        }, 0)
+      const displayCharges = calculateDisplayCharges()
+      const finalRoomCharge = displayCharges.finalRate
+      const discountDeduction = displayCharges.discountAmount
 
       const guestStatus = registrationType === 'reservation' ? 'reserved' : registrationType === 'online_booking' ? 'reserved' : 'checked_in'
 
@@ -598,17 +583,24 @@ export default function NewGuest() {
         numberOfNights = 1
       }
 
+      // Destructure discount_amount so we can save the actual deduction amount for agreed rates
+      const { discount_amount: rawDiscountAmount, ...restFormData } = formData
+      const savedDiscountAmount = (formData.discount_type === 'discounted_rate' || formData.discount_type === 'nightly_rate')
+        ? discountDeduction
+        : (parseFloat(formData.discount_amount) || 0)
+
       const { data: guest, error: guestError } = await supabase
         .from('guests')
         .insert([{
           grc_number: grcNumber,
-          ...formData,
+          ...restFormData,
           room_type: typeSummary,
           advance_payment_method: formData.advance_payment_method || null,
           discount_type: formData.discount_type || null,
+          discount_amount: savedDiscountAmount,
           voucher_number: formData.voucher_number || null,
           passport_nic_document_url: documentUrl || null,
-          total_room_charge: totalRoomCharge,
+          total_room_charge: finalRoomCharge,
           room_occupancies: formData.room_occupancies,
           number_of_nights: numberOfNights,
           status: guestStatus,
@@ -730,14 +722,30 @@ export default function NewGuest() {
 
     let discountAmount = 0
     let finalRate = originalRate
+    const inputVal = parseFloat(formData.discount_amount) || 0
 
-    if (formData.discount_type && formData.discount_amount > 0) {
+    if (formData.discount_type && inputVal > 0) {
       if (formData.discount_type === 'percentage') {
-        discountAmount = (originalRate * formData.discount_amount) / 100
+        discountAmount = (originalRate * Math.min(100, inputVal)) / 100
+        finalRate = Math.max(0, originalRate - discountAmount)
       } else if (formData.discount_type === 'fixed') {
-        discountAmount = formData.discount_amount
+        discountAmount = Math.min(originalRate, inputVal)
+        finalRate = Math.max(0, originalRate - discountAmount)
+      } else if (formData.discount_type === 'discounted_rate') {
+        // User entered agreed total room rate for the stay (e.g. 25,000 for 7 days)
+        const agreedRate = Math.min(originalRate, inputVal)
+        discountAmount = Math.max(0, originalRate - agreedRate)
+        finalRate = agreedRate
+      } else if (formData.discount_type === 'nightly_rate') {
+        const arrival = new Date(formData.date_of_arrival)
+        const departure = new Date(formData.date_of_departure)
+        let nights = differenceInDays(departure, arrival)
+        if (nights === 0 && formData.date_of_arrival === formData.date_of_departure) nights = 1
+        const totalAgreed = inputVal * Math.max(1, nights) * formData.room_numbers.length
+        const agreedRate = Math.min(originalRate, totalAgreed)
+        discountAmount = Math.max(0, originalRate - agreedRate)
+        finalRate = agreedRate
       }
-      finalRate = Math.max(0, originalRate - discountAmount)
     }
 
     return { originalRate, discountAmount, finalRate }
@@ -1658,12 +1666,22 @@ export default function NewGuest() {
                 disabled={loading}
               >
                 <option value="">No Discount</option>
+                <option value="discounted_rate">Discounted Room Rate (Agreed Total LKR)</option>
+                <option value="fixed">Fixed Discount Amount (Deduct from Total LKR)</option>
                 <option value="percentage">Percentage (%)</option>
-                <option value="fixed">Fixed Amount (LKR)</option>
+                <option value="nightly_rate">Discounted Nightly Rate (LKR / night)</option>
               </select>
             </div>
             <div>
-              <label className="label">Discount Amount</label>
+              <label className="label">
+                {formData.discount_type === 'discounted_rate'
+                  ? 'Agreed Total Room Price (LKR)'
+                  : formData.discount_type === 'nightly_rate'
+                  ? 'Discounted Rate per Night (LKR)'
+                  : formData.discount_type === 'percentage'
+                  ? 'Discount Percentage (%)'
+                  : 'Discount Amount to Deduct (LKR)'}
+              </label>
               <input
                 type="number"
                 name="discount_amount"
@@ -1672,13 +1690,60 @@ export default function NewGuest() {
                 className="input-field"
                 min="0"
                 step={formData.discount_type === 'percentage' ? "0.1" : "100"}
-                max={formData.discount_type === 'percentage' ? "100" : undefined}
+                max={
+                  formData.discount_type === 'percentage' 
+                    ? "100" 
+                    : formData.discount_type === 'discounted_rate'
+                    ? displayCharges.originalRate || undefined
+                    : undefined
+                }
                 disabled={!formData.discount_type || loading}
-                placeholder={formData.discount_type === 'percentage' ? '0-100' : '0'}
+                placeholder={
+                  formData.discount_type === 'percentage' 
+                    ? '0-100' 
+                    : formData.discount_type === 'discounted_rate'
+                    ? 'e.g. 25000'
+                    : formData.discount_type === 'nightly_rate'
+                    ? 'e.g. 5000'
+                    : '0'
+                }
               />
-              <p className="text-xs text-gray-500 mt-1">
-                {formData.discount_type === 'percentage' ? 'Enter percentage (0-100)' : formData.discount_type === 'fixed' ? 'Enter fixed amount in LKR' : 'Select discount type first'}
-              </p>
+              <div className="text-xs text-gray-500 mt-1">
+                {formData.discount_type === 'percentage' ? (
+                  <span>Enter percentage (0-100)% to deduct from standard room price.</span>
+                ) : formData.discount_type === 'discounted_rate' ? (
+                  displayCharges.originalRate > 0 && formData.discount_amount > 0 ? (
+                    parseFloat(formData.discount_amount) <= displayCharges.originalRate ? (
+                      <span className="text-emerald-500 font-medium">
+                        ✓ Final bill will be {formatCurrency(parseFloat(formData.discount_amount))}. A discount of {formatCurrency(displayCharges.discountAmount)} is deducted from standard price ({formatCurrency(displayCharges.originalRate)}).
+                      </span>
+                    ) : (
+                      <span className="text-amber-500 font-medium">
+                        ⚠️ Agreed rate cannot exceed standard rate of {formatCurrency(displayCharges.originalRate)}.
+                      </span>
+                    )
+                  ) : (
+                    <span>Enter the agreed total price for the entire stay (e.g. 25,000 for 7 days). The bill will be set to this amount.</span>
+                  )
+                ) : formData.discount_type === 'nightly_rate' ? (
+                  <span>Enter custom rate per room per night. System will multiply by stay nights and deduct difference from standard price.</span>
+                ) : formData.discount_type === 'fixed' ? (
+                  displayCharges.originalRate > 0 && formData.discount_amount > 0 ? (
+                    <span>
+                      Fixed deduction of {formatCurrency(parseFloat(formData.discount_amount))} off standard price ({formatCurrency(displayCharges.originalRate)}). Final bill: {formatCurrency(displayCharges.finalRate)}.
+                      {parseFloat(formData.discount_amount) < displayCharges.originalRate && (
+                        <span className="block text-primary-500 mt-0.5 font-medium">
+                          💡 Tip: To set the final bill directly to {formatCurrency(parseFloat(formData.discount_amount))}, choose "Discounted Room Rate (Agreed Total LKR)".
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span>Enter fixed amount in LKR to subtract from standard room price.</span>
+                  )
+                ) : (
+                  <span>Select discount type first</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1697,7 +1762,15 @@ export default function NewGuest() {
                   <>
                     <div className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
                       <span className="text-slate-500 dark:text-gray-400">
-                        Discount ({formData.discount_type === 'percentage' ? `${formData.discount_amount}%` : 'Fixed'})
+                        Discount ({
+                          formData.discount_type === 'percentage' 
+                            ? `${formData.discount_amount}%` 
+                            : formData.discount_type === 'discounted_rate'
+                            ? `Agreed Rate: ${formatCurrency(formData.discount_amount)}`
+                            : formData.discount_type === 'nightly_rate'
+                            ? `Nightly: ${formatCurrency(formData.discount_amount)}/night`
+                            : 'Fixed'
+                        })
                       </span>
                       <span className="text-red-400 font-bold">
                         - {formatCurrency(displayCharges.discountAmount)}

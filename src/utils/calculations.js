@@ -68,8 +68,8 @@ export function calculateDiscountInfo(discountType, discountAmount, discountedRo
       originalRoomCharge = discountedCharge / (1 - discountPercent / 100)
       actualDiscountAmount = originalRoomCharge - discountedCharge
     }
-  } else if (discountType === 'fixed') {
-    // Reverse calculate: original = discounted + fixed amount
+  } else if (discountType === 'fixed' || discountType === 'discounted_rate' || discountType === 'nightly_rate') {
+    // Reverse calculate: original = discounted + discount deduction amount
     const fixedAmount = parseFloat(discountAmount) || 0
     originalRoomCharge = discountedCharge + fixedAmount
     actualDiscountAmount = fixedAmount
@@ -264,6 +264,10 @@ export function applyDiscount(baseAmount, discountType, discountValue) {
   } else if (discountType === 'fixed') {
     discountAmount = Math.min(discount, amount)
     finalAmount = amount - discountAmount
+  } else if (discountType === 'discounted_rate') {
+    const agreedRate = Math.min(amount, discount)
+    discountAmount = Math.max(0, amount - agreedRate)
+    finalAmount = agreedRate
   }
 
   return {
@@ -301,11 +305,15 @@ export function formatDiscountDisplay(discountType, discountValue) {
 
   if (discountType === 'percentage') {
     return `${discountValue}% Off`
+  } else if (discountType === 'discounted_rate') {
+    return `Agreed Room Rate`
+  } else if (discountType === 'nightly_rate') {
+    return `Discounted Nightly Rate`
   } else if (discountType === 'fixed') {
     return `${formatCurrency(discountValue)} Off`
   }
 
-  return 'No Discount'
+  return `${discountValue} Off`
 }
 
 /**
